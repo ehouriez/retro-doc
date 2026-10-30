@@ -1,0 +1,14 @@
+{
+  "name": "retro-doc",
+  "owner": { "name": "Emmanuel Houriez" },
+  "metadata": {
+    "description": "Marketplace for the retro-doc skill: generate targeted Diataxis retro-documentation from an existing codebase."
+  },
+  "plugins": [
+    {
+      "name": "retro-doc",
+      "source": ".",
+      "description": "Reusable, multi-project retro-documentation generator (Reference + Explanation + INDEX) driven by the Diataxis method. Prompt-only, no runtime dependency, no auto commit/push."
+    }
+  ]
+}

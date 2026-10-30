@@ -1,0 +1,11 @@
+{
+  "name": "retro-doc",
+  "description": "Generate targeted retro-documentation from an existing codebase using the Diataxis method (Reference + Explanation + INDEX by default; Tutorial/How-to on demand). Prompt-only, no runtime dependency, output language auto-detected per project, no auto commit/push.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Emmanuel Houriez"
+  },
+  "homepage": "https://github.com/ehouriez/retro-doc",
+  "repository": "https://github.com/ehouriez/retro-doc",
+  "license": "MIT"
+}
