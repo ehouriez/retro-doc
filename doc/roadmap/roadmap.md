@@ -13,16 +13,13 @@ Backlog consolidé : plans nommés d'après leur issue GitHub (voir `doc/roadmap
 
 ## À faire
 
-### [Issue: #1] retro-doc skill [PRIORITÉ: HAUTE] [Complexité: L] 🟢
-
-Plan : [`1-retro-doc-skill.md`](1-retro-doc-skill.md)
-
-Construire le skill plugin `retro-doc` : générateur de rétro-documentation Diataxis ciblée, réutilisable multi-projets, 100 % prompt, sans dépendance gstack/bun ni commit/push auto.
+_(aucun plan actif)_
 
 ---
 
 ## Fait
 
-### Plans livrés
+### Plans livrés (2026-10-31)
 
-_(aucun pour l'instant)_
+- **[Issue: #1] `#1` — retro-doc skill** (2026-10-31) 🔵 — Skill plugin de rétro-documentation Diataxis ciblée (Reference + Explanation + INDEX), multi-projets, 100 % prompt, sans dépendance gstack/bun, sans commit/push auto. Validé par install réelle + run sur auxitum.
+  [`1-retro-doc-skill.md`](done/1-retro-doc-skill.md)

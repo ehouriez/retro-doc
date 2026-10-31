@@ -2,9 +2,10 @@
 plan:
   id: '1'
   name: 1-retro-doc-skill.md
-  link: https://github.com/ehouriez/retro-doc/blob/main/doc/roadmap/1-retro-doc-skill.md
-status: active
+  link: https://github.com/ehouriez/retro-doc/blob/main/doc/roadmap/done/1-retro-doc-skill.md
+status: done
 date: 2026-10-30
+enriched: 2026-10-31
 description: >
   Build the retro-doc plugin skill: a reusable, multi-project Diataxis-based
   retro-documentation generator (Reference + Explanation + INDEX), prompt-only,
@@ -59,8 +60,8 @@ commit/push automatique. Il reprend la méthode de `garrytan/document-generate`
 - [x] Étape 4 — Logique de sortie : détection base doc/docs, dossier retro/, INDEX + lien README, scan secrets grep, garde no-commit/push (M · standard → Sonnet)
 - [x] Étape 5 — Références Markdown : templates Reference / Explanation / INDEX + extension optionnelle Tutorial/How-to (M · standard → Sonnet)
 - [x] Étape 6 — README du repo : install marketplace, usage, exemples (S · standard → Sonnet)
-- [ ] 🧪 Tests — Rédiger et exécuter la procédure de validation (install réelle du plugin + run sur auxitum)
-- [ ] ✅ Validation — Vérifier les résultats et clôturer
+- [x] 🧪 Tests — Rédiger et exécuter la procédure de validation (install réelle du plugin + run sur auxitum)
+- [x] ✅ Validation — Vérifier les résultats et clôturer
 
 ## Décisions techniques
 
@@ -140,9 +141,20 @@ git -C /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum status --short
 
 | Date | Test | Attendu | Observé | Verdict |
 |------|------|---------|---------|---------|
+| 2026-10-31 | Install plugin | `retro-doc@retro-doc` installé | Install réussie, skill disponible (`retro-doc:retro-doc`) | ✅ |
+| 2026-10-31 | Run sur auxitum | `doc/retro/` avec reference-*, explanation-*, INDEX en FR | 9 reference-*, 4 explanation-*, INDEX.md, langue `fr` persistée | ✅ |
+| 2026-10-31 | Lien README | 1 ligne vers `doc/retro/INDEX.md` | README.md:421 lien présent | ✅ |
+| 2026-10-31 | Pas de commit auto | fichiers untracked dans auxitum | `git status` → `?? doc/retro/` (untracked) | ✅ |
+| 2026-10-31 | Liens cassés | aucun | aucun target `.md` manquant | ✅ |
+| 2026-10-31 | Scan secrets | aucun secret réel | 0 match | ✅ |
+| 2026-10-31 | Exactitude (anti-hallucination) | `file:line` cités réels | `requiresAuth` bien à `server.js:127`, auth middleware ~146 | ✅ |
 
 ## Journal de session
 
 ### Session 2026-10-30
 - ✅ Fait : cadrage complet, création du repo public `ehouriez/retro-doc`, issue #1, plan créé.
-- 📋 Prochain : étape 1 — structure du plugin marketplace.
+- ✅ Fait : implémentation one-shot des étapes 1-6 (manifests, SKILL.md, references, README, LICENSE).
+
+### Session 2026-10-31
+- ✅ Fait : tests finaux OK (install réelle + run sur auxitum), validation vérifiée sur `auxitum/doc/retro/` (exactitude, liens, secrets, absence de commit auto).
+- ✅ Clôture : plan `done`, déplacé dans `done/`, roadmap.md mis à jour, issue #1 fermée.
