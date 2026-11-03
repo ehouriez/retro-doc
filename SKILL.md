@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: Emmanuel Houriez
-  version: "1.0.0"
+  version: "2.0.0"
 allowed-tools:
   - Bash
   - Read
@@ -30,7 +30,8 @@ codebase: a feature, a module, or a whole project. You **research the code
 thoroughly before writing a single line of documentation**.
 
 This is a **prompt-only** skill: it has no scripts and no runtime dependency. It
-uses only your own tools (Bash, Read, Write, Edit, Grep, Glob, AskUserQuestion).
+uses only your own tools (Bash, Read, Write, Edit, Grep, Glob, AskUserQuestion,
+and the `Agent` tool for delegated research when available).
 
 ## Core principles
 
@@ -43,6 +44,9 @@ uses only your own tools (Bash, Read, Write, Edit, Grep, Glob, AskUserQuestion).
   INDEX** — what retro-documentation of existing code actually needs. Tutorial
   and How-to are produced **only on explicit request** (they describe intended
   learning paths, which rarely exist yet in a retro context).
+- **Regenerate only what changed.** Repeated runs are incremental: an entity
+  whose sources did not change since the last run is neither re-researched nor
+  rewritten (see Step 3).
 - **Never commit or push.** You write files and stop. The user owns all git
   operations. Do not run `git add`, `git commit`, `git push`, or create PRs.
 
@@ -130,11 +134,83 @@ hand-written documentation.
 2. **Write under `<base>/retro/`.** All generated files live there. This is the
    frontier between generated (regenerable) and authored content.
 3. On regeneration, you may overwrite files under `<base>/retro/` freely; never
-   write outside it except the single README link (Step 7).
+   write outside it except the single README link (Step 8).
 
 ---
 
-## Step 3 — Codebase archaeology (delegated research phase)
+## Step 3 — Regeneration mode (full vs incremental)
+
+Before any archaeology, decide whether this run regenerates **everything** or only
+the parts the code changed since the last run. This is what makes repeated runs
+cheap: an unchanged entity is never re-researched and never rewritten. This step
+runs **before** archaeology (Step 4) because the mode decides **which** entities
+the researcher investigates.
+
+### Decide the mode
+
+Read the cache resolved in Step 1 (`<base>/retro/.retro-doc.yml`):
+
+```
+IF cache absent OR schema_version ∈ {absent, 1}   → FULL   (v1 cache / first run)
+ELSE IF the prompt contains "full"                 → FULL   (explicit override)
+ELSE (cache is v2; default, or the prompt says "incrémental"/"incremental") → INCREMENTAL
+```
+
+- A missing `schema_version` (or `1`) is the v1 retro-compat signal: force a FULL
+  run, then Step 9 rewrites the cache as v2 — transparent, no breakage on a
+  project already documented by v1.
+- `full` in the prompt always forces a full run even when a v2 cache exists.
+- With a v2 cache and no keyword, **incremental is the default** — no interruption,
+  still steerable by keyword.
+
+A **FULL** run documents every entity in scope: skip the rest of this step and go
+to Step 4 with the full scope.
+
+### Incremental run — compute the invalidated entities
+
+1. **Diff the sources against the last run** (committed history only):
+
+   ```bash
+   git diff --name-only <source_sha>..HEAD
+   ```
+
+   `<source_sha>` is the `source_sha` value from the cache.
+
+2. **If this is not a git repo, or `<source_sha>` is unknown** (missing commit,
+   shallow clone, rewritten history) → **fall back to a FULL run and say so.** Do
+   not guess a diff.
+
+3. **Invalidate by changed source, then propagate one level** down the `deps`
+   graph persisted in the cache:
+
+   ```
+   invalidated = { e ∈ entities | some file in e.sources appears in `changed` }
+   invalidated += { e ∈ entities | e.deps ∩ invalidated ≠ ∅ }   # one level only
+   ```
+
+   - A source matches an entity when the changed path equals the **file part** of
+     any `file:line` / `file:start-end` anchor in `e.sources`.
+   - **One level only** is deliberate: a full transitive closure would re-invalidate
+     almost everything and cancel the saving (see the plan's "Invalidation"
+     decision). A dependent of a dependent is not invalidated.
+
+4. **Scope the rest of the run to `invalidated` only:** Step 4 researches only these
+   entities; Steps 6–8 rewrite only their docs and INDEX entries; every
+   non-invalidated entity keeps its existing doc files and its cache entry
+   unchanged.
+
+5. **Announce the mode** before researching, e.g.:
+   "Incremental run — 2 entity(ies) invalidated by the diff (`metering-service`
+   directly, `billing` via deps); researching and rewriting only those, N others
+   left intact."
+
+> **Limit — committed changes only.** The diff base is `source_sha..HEAD`, so
+> uncommitted working-tree edits are not detected. Commit before an incremental
+> run, or pass `full` to force a complete regeneration.
+
+---
+
+## Step 4 — Codebase archaeology (delegated research phase)
 
 The quality of the documentation depends on how well the code is understood, so
 this step carries the most weight. Reading the whole source surface is also the
@@ -144,6 +220,10 @@ which returns a provenance-tagged **concept map**. The calling model (the
 **writer**) keeps the judgement work (partition, Explanation prose, arbitration
 of doubtful claims, final writing). See `references/delegation.md` for the two
 roles, the tier → model mapping, and the full output contract.
+
+> **Research scope.** On a **full** run, research every entity in scope. On an
+> **incremental** run (Step 3), research **only the invalidated entities**; reuse
+> every non-invalidated entity's map entry unchanged from the cache.
 
 > **Writer model recommendation (non-blocking).** The heavy reading is off the
 > writer, so keeping the writer on a `reasoning` model costs only on output —
@@ -178,20 +258,30 @@ roles, the tier → model mapping, and the full output contract.
 3. **Fallback — inline archaeology.** If the `Agent` tool or the target model is
    unavailable, the writer does the research itself (identical to the v1 Step 3:
    read implementation end to end, tests, dependencies, inline comments; build
-   the same concept map). Delegation is an optimisation, not a dependency — the
-   skill stays prompt-only. The rest of the pipeline is identical either way.
+   the same concept map, with the same `source`/`confidence` on every claim).
+   Delegation is an optimisation, not a dependency — the skill stays prompt-only.
+   The rest of the pipeline is identical either way.
 
 4. **Consolidate the map.** The returned concept map (or the inline one) is the
    single input to partition and writing. Each claim's `source`, the
    `dependencies`, and the confidence feed the persisted cache
    (`references/cache-schema.md`).
 
-5. State what you found: "Researched N files, K public-surface items, M concepts,
-   J design decisions." Then proceed to partition.
+5. **Targeted re-read of low-confidence claims (quality guard).** Before partition
+   and writing, the **writer itself** — not a gate, not a sub-agent — scans the
+   concept map and, for every claim marked `confidence: low`, re-reads the few
+   cited lines via `Read`/`Grep` on its `file:line` `source`: **the cited lines
+   only, never the whole file.** Correct or confirm the claim in the map. This is
+   internal to the run, silent, with **no user interaction, no `/model`, no
+   `AskUserQuestion`**. It extends the `file:line` accuracy validated in v1 and
+   keeps quality ≥ v1 even when the researcher ran on a `standard` model.
+
+6. State what you found: "Researched N files, K public-surface items, M concepts,
+   J design decisions; re-read P low-confidence claims." Then proceed to partition.
 
 ---
 
-## Step 4 — Diataxis partition
+## Step 5 — Diataxis partition
 
 For each target entity, decide which quadrants to produce. Default retro-doc set
 is **Reference + Explanation + INDEX**. Add Tutorial/How-to **only if the user
@@ -211,7 +301,7 @@ writing. For smaller scopes, proceed.
 
 ---
 
-## Step 5 — Write Reference documentation first
+## Step 6 — Write Reference documentation first
 
 Reference docs are the foundation: factual, complete, derived directly from code.
 Write them before Explanation because they establish the vocabulary. Use the
@@ -225,9 +315,12 @@ Rules:
 - Do not explain *why* here — that belongs in Explanation.
 - One Reference doc per coherent entity; file name `reference-<slug>.md`.
 
+> **Incremental runs:** write only the Reference docs of the invalidated entities
+> (Step 3); leave every other `reference-*.md` untouched.
+
 ---
 
-## Step 6 — Write Explanation documentation
+## Step 7 — Write Explanation documentation
 
 Explanation docs answer "why does this work this way?" — the design rationale.
 Use the Explanation template in `references/templates.md`.
@@ -240,6 +333,9 @@ Rules:
   discoverable; never invent them.
 - Do not repeat reference material — link to it. File name `explanation-<slug>.md`.
 
+> **Incremental runs:** write only the Explanation docs of the invalidated entities
+> (Step 3); leave every other `explanation-*.md` untouched.
+
 ### Tutorial / How-to (on request only)
 
 If the user explicitly asked for Tutorial or How-to guides, use the corresponding
@@ -247,7 +343,7 @@ templates in `references/templates.md`. Otherwise skip them.
 
 ---
 
-## Step 7 — INDEX & discoverability
+## Step 8 — INDEX & discoverability
 
 After writing the docs:
 
@@ -270,7 +366,7 @@ After writing the docs:
 
 ---
 
-## Step 8 — Cache persistence (write `.retro-doc.yml` v2)
+## Step 9 — Cache persistence (write `.retro-doc.yml` v2)
 
 After writing all documentation and the INDEX, persist the run results so future
 incremental runs can reuse the concept map and skip unchanged entities.
@@ -281,11 +377,11 @@ incremental runs can reuse the concept map and skip unchanged entities.
    git rev-parse HEAD 2>/dev/null || true
    ```
 
-2. **Build the `entities[]` array** from the concept map assembled in Step 3 and
-   the partition and files written in Steps 4–7. For each entity:
+2. **Build the `entities[]` array** from the concept map assembled in Step 4 and
+   the partition and files written in Steps 5–8. For each entity:
 
    - `id` — kebab-case entity id from the concept map.
-   - `quadrants` — the quadrants produced (from Step 4 partition).
+   - `quadrants` — the quadrants produced (from Step 5 partition).
    - `docs` — map of quadrant → filename written under `<base>/retro/`.
    - `sources` — `file:line` provenance anchors from the concept map's claims.
    - `deps` — entity ids from the concept map's `dependencies` field.
@@ -314,18 +410,19 @@ incremental runs can reuse the concept map and skip unchanged entities.
 
    **On a full run:** write all entities in scope.
    **On an incremental run:** rewrite only the invalidated entities' entries; copy
-   the non-invalidated entries unchanged from the previous cache.
+   the non-invalidated entries unchanged from the previous cache. `source_sha` is
+   set to the current HEAD in both cases.
 
-4. **Coherence with Step 7 (INDEX):** the entities written here must match exactly
+4. **Coherence with Step 8 (INDEX):** the entities written here must match exactly
    the entities whose doc files are present under `<base>/retro/`.
 
-5. **Coherence with Step 10 (secret scan):** pass the set of files just written
+5. **Coherence with Step 11 (secret scan):** pass the set of files just written
    (from `docs` entries) to the scan. On a full run this is equivalent to all
    files under `<base>/retro/`; on an incremental run only the regenerated subset.
 
 ---
 
-## Step 9 — Quality self-review
+## Step 10 — Quality self-review
 
 Before reporting done, review each document:
 
@@ -333,6 +430,7 @@ Before reporting done, review each document:
 - [ ] Every API description matches the actual code signature.
 - [ ] Every command/example would work if copy-pasted.
 - [ ] No stale references to renamed or removed entities.
+- [ ] Every `confidence: low` claim was re-read against its `file:line` source (Step 4).
 
 **Completeness gate**
 - [ ] Reference docs cover 100% of the public surface in scope.
@@ -348,10 +446,10 @@ Fix any failure before reporting.
 
 ---
 
-## Step 10 — Secret scan, then STOP (no commit, no push)
+## Step 11 — Secret scan, then STOP (no commit, no push)
 
 > **Scan scope.** Target only the files written or rewritten during this run —
-> the filenames from the `docs` entries of Step 8's entities, plus
+> the filenames from the `docs` entries of Step 9's entities, plus
 > `.retro-doc.yml` itself. On a full run this equals all files under
 > `<base>/retro/`; on an incremental run it covers only the regenerated subset.
 
@@ -380,6 +478,7 @@ Fix any failure before reporting.
 ```
 retro-doc generated:
   Scope:     <what was documented>
+  Mode:      <full | incremental (K invalidated, N reused)>
   Language:  <lang>  (persisted in <base>/retro/.retro-doc.yml)
   Output:    <base>/retro/  (+ 1 line added to README)
   Files:     <N> new, <M> updated
@@ -397,10 +496,12 @@ Next (yours): review the diff, then commit and push.
 
 ## Hard rules
 
-- **Research before writing.** Step 3 is not optional.
+- **Research before writing.** Step 4 is not optional.
 - **Accuracy over everything.** Traceable to code or not stated.
 - **Reference ≠ Explanation ≠ How-to ≠ Tutorial.** Do not mix quadrants.
 - **Default is Reference + Explanation + INDEX.** Tutorial/How-to on request only.
+- **Incremental by default on a v2 cache.** Re-research and rewrite only what the
+  diff invalidated; `full` in the prompt forces a complete run.
 - **Dedicated output dir.** Generated files stay under `<base>/retro/`.
 - **One language per project, asked once, persisted.**
 - **Never commit or push.** Write files, scan for secrets, report, stop.

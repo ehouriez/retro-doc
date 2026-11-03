@@ -57,9 +57,9 @@ reste 100 % prompt-only.
 - [x] Étape 1 — Schéma `.retro-doc.yml` étendu (`language`, `source_sha`, `entities[]{sources[file:line], deps[], confidence, quadrants}`) + extension `allowed-tools` (`Agent`/`Task`) + doc du format cache dans `references/` (M · reasoning → Opus)
 - [x] Étape 2 — Step 3 refondu : délégation à un sous-agent `general-purpose` configurable (`Agent` frais avec override `model` vers le tier `standard`, **jamais un `fork`** qui hériterait du contexte et ignorerait l'override), cartographie légère intégrée, parallélisme adaptatif au scope, contrat de sortie = concept map à provenance, fallback inline si `Agent` indisponible. Documenter les **deux rôles** (rédacteur / chercheur) et émettre une **recommandation non bloquante** : rédacteur en tier `reasoning` (L · reasoning → Opus)
 - [x] Étape 3 — Persistance du cache enrichi en fin de run (map + SHA courant) dans `.retro-doc.yml`, cohérence avec Step 7 (INDEX) et Step 9 (stop) (S · standard → Sonnet)
-- [ ] Étape 4 — Régénération incrémentale : lecture cache + SHA, `git diff <sha>..HEAD`, défaut incrémental si cache présent, mots-clés `full`/`incrémental`, rétrocompat = full forcé si cache v1 (M · reasoning → Opus)
-- [ ] Étape 5 — Invalidation par entité + propagation aux dépendants directs (1 niveau) depuis le graphe `deps` du map (M · reasoning → Opus)
-- [ ] Étape 6 — Garde-fou qualité : marquage `confidence` par claim par le sous-agent, re-lecture ciblée par le **rédacteur lui-même** (le modèle appelant, pas une gate ni un sous-agent) via ses propres `Read`/`Grep` sur les `file:line` des claims `confidence: low`, avant écriture. Interne au run, silencieux, sans interaction utilisateur (S · reasoning → Opus)
+- [x] Étape 4 — Régénération incrémentale : lecture cache + SHA, `git diff <sha>..HEAD`, défaut incrémental si cache présent, mots-clés `full`/`incrémental`, rétrocompat = full forcé si cache v1 (M · reasoning → Opus)
+- [x] Étape 5 — Invalidation par entité + propagation aux dépendants directs (1 niveau) depuis le graphe `deps` du map (M · reasoning → Opus)
+- [x] Étape 6 — Garde-fou qualité : marquage `confidence` par claim par le sous-agent, re-lecture ciblée par le **rédacteur lui-même** (le modèle appelant, pas une gate ni un sous-agent) via ses propres `Read`/`Grep` sur les `file:line` des claims `confidence: low`, avant écriture. Interne au run, silencieux, sans interaction utilisateur (S · reasoning → Opus)
 - [ ] 🧪 Tests — Rédiger et exécuter la procédure de validation (3 scénarios : neuf, rétrocompat, incrémental sur diff)
 - [ ] ✅ Validation — Vérifier les résultats et clôturer
 
@@ -229,7 +229,7 @@ FIN (full ou incrémental) :
 - `auxitum` cloné en `/mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum`, branche `dev`, working tree propre.
 - `auxitum/doc/retro/` v1.0.0 **présent et commité** (généré par le run v1, poussé sur `dev`).
 - `claude` CLI disponible ; scope de doc identique au run v1 pour comparabilité : **module metering**.
-- ⚠️ **Décision à confirmer (étape 4)** : la base de diff incrémental est `source_sha..HEAD` → le scénario 3 **commite** le marqueur pour que HEAD avance. Si l'implémentation choisit de couvrir aussi les modifs working-tree non commitées, adapter le scénario 3.
+- ✅ **Décision tranchée (étape 4)** : base de diff incrémental = `source_sha..HEAD` (**commité seul**, working-tree non couvert). Le scénario 3 **commite** le marqueur pour que HEAD avance — conforme à l'implémentation. Aucune adaptation nécessaire.
 
 ### Procédure de test
 
@@ -328,3 +328,11 @@ git reset --hard HEAD~1
 - ✅ Étape 2 : Step 3 de `SKILL.md` refondu (archéologie → délégation) — carto légère inline, parallélisme adaptatif, `Agent general-purpose` + `model: sonnet` (jamais `fork`), fallback inline, reco non bloquante rédacteur `reasoning` ; contrat concept map + 2 rôles + mapping tier→modèle dans `references/delegation.md`.
 - ✅ Étape 3 : nouveau step `SKILL.md` **Step 8 — Cache persistence** inséré entre INDEX et Quality review ; steps 8→9 et 9→10 renommés ; note incremental ajoutée à Step 7 ; note scan scope ajoutée à Step 10.
 - 📋 Prochain : étapes 4→6 (régén incrémentale, invalidation, garde-fou qualité), puis 🧪 Tests + ✅ Validation sur auxitum.
+
+### Session 2026-11-03 (implémentation étapes 4-6, one-shot)
+- ✅ Étape 4 : nouveau **Step 3 — Regeneration mode (full vs incremental)** inséré **avant** l'archéologie dans `SKILL.md` ; décide full/incrémental (cache absent/v1 → full forcé ; mot-clé `full` → full ; cache v2 par défaut ou `incrémental` → incrémental) ; diff `git diff --name-only <source_sha>..HEAD` ; fallback full si pas de repo / SHA inconnu.
+- ✅ Étape 5 : algo d'invalidation dans Step 3 — `invalidated = {e | source de e ∈ changed}` puis propagation **1 niveau** via `e.deps ∩ invalidated` ; le reste du run (archéologie + écriture docs + INDEX + scan) est borné aux entités invalidées ; entités non touchées conservées telles quelles.
+- ✅ Étape 6 : garde-fou qualité = item 5 du Step 4 (archéologie) — re-lecture ciblée par le **rédacteur lui-même** des claims `confidence: low` via `Read`/`Grep` sur leurs `file:line` (lignes citées seulement), interne/silencieux, aucune interaction ; ajout d'une checkbox dédiée à la gate Accuracy (Step 10).
+- 🔧 Renumérotation : insertion du Step 3 a décalé l'archéologie → Step 4, puis 4→5…10→11 ; toutes les cross-refs internes et le résumé final (`Mode: full | incremental`) mis à jour ; version metadata bumpée `1.0.0` → `2.0.0`.
+- 🔒 Décision étape 4 tranchée : base de diff = `source_sha..HEAD` (commité seul) ; limite documentée dans le Step 3 (editions working-tree non détectées → commiter ou `full`). Conforme au scénario de test 3 qui commite le marqueur.
+- 📋 Prochain : 🧪 Tests (3 scénarios sur auxitum) puis ✅ Validation.
