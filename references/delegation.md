@@ -57,6 +57,14 @@ precisely where judgement pays. State the recommendation once, do not block.
      `grep -rn --exclude-dir={node_modules,dist,build,.next,vendor,.git} …` (or
      `rg`, which honours `.gitignore` by default). Same exclusion set as the
      cartography `find` in `SKILL.md` Step 4.
+   - **Self-check before returning (mandatory in the prompt).** Instruct the
+     researcher to verify before handing back its concept map:
+     - Every entity in the announced scope is covered (none omitted).
+     - Every non-trivial claim carries `source` (`file:line`) and `confidence`.
+     - No entity, function, relation or endpoint was invented (everything is
+       traceable to the code).
+     - All recursive searches excluded vendored/build trees (same hygiene as
+       required above).
    - **Never use `fork`.** A fork inherits the parent context (which ruins the
      token economy) and ignores the `model` override.
 4. **Fallback — tool genuinely unavailable ONLY.** The writer does the archaeology

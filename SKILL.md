@@ -264,8 +264,14 @@ roles, the tier → model mapping, and the full output contract.
    `grep -rn --exclude-dir={node_modules,dist,build,.next,vendor,.git} …` or `rg`
    (same exclusion set as the cartography `find` above): without it a `grep -rn`
    over a project with dependencies installed scans tens of thousands of files and
-   hangs. **Never use `fork`** — it inherits the parent context (ruining the token
-   economy) and ignores the `model` override.
+   hangs. **Self-check before returning (mandatory in the prompt).** Instruct
+   the researcher to verify before handing back its concept map: every entity
+   in the announced scope is covered (none omitted); every non-trivial claim
+   carries `source` (`file:line`) and `confidence`; no entity, function,
+   relation or endpoint was invented (everything traceable to the code); all
+   recursive searches excluded vendored/build trees. **Never use `fork`** — it
+   inherits the parent context (ruining the token economy) and ignores the
+   `model` override.
 
 3. **Fallback — inline archaeology (tool genuinely unavailable ONLY).** Only when
    the `Agent` tool cannot be used — not callable in this IDE, erroring, or unable

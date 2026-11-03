@@ -78,7 +78,7 @@ modèle figé en frontmatter.
 
 ## Étapes
 
-- [ ] Étape 1 — **Lot A** : ajouter une checklist d'auto-contrôle en fin de prompt researcher — couverture complète du périmètre / chaque claim non-trivial porte `source`+`confidence` / aucune entité ou relation inventée. Dans `SKILL.md` (étape 4, delegation) + `references/delegation.md` (contrat concept-map). (XS · standard → Sonnet)
+- [x] Étape 1 — **Lot A** : ajouter une checklist d'auto-contrôle en fin de prompt researcher — couverture complète du périmètre / chaque claim non-trivial porte `source`+`confidence` / aucune entité ou relation inventée. Dans `SKILL.md` (étape 4, delegation) + `references/delegation.md` (contrat concept-map). (XS · standard → Sonnet)
 - [ ] Étape 2 — **Lot B** : étendre le schéma de cache v2 avec `entities[].status` ∈ {`catalogued`, `generated`}. Rétrocompat : entité sans `status` dans un cache v2 existant → traitée comme `generated` (comportement actuel). Documenter dans `references/cache-schema.md` + étape « Cache persistence » de `SKILL.md`. (M · reasoning → Opus)
 - [ ] Étape 3 — **Lot B** : mode **catalogue par défaut**. Un run sans `--expand` produit l'inventaire : cartographie légère (glob/grep, déjà faite en étape 4) → une entité par sous-système avec `id` + une ligne de description, **sans déléguer l'archéologie profonde** et **sans écrire de fiches**. Persister chaque entité `status: catalogued`. Écrire/mettre à jour l'INDEX. Décrire ce branchement dans `SKILL.md` (étape 3 « Regeneration mode » ou nouvelle sous-section amont). (L · reasoning → Opus)
 - [ ] Étape 4 — **Lot B** : flag `--expand <id>` et `--expand all` (défaut si le flag est absent OU donné sans argument). Pour chaque entité ciblée : déléguer la recherche (researcher Sonnet, inchangé), écrire Reference + Explanation, basculer `status: generated`, mettre à jour le cache et l'INDEX. `--expand all` = affine toutes les entités `catalogued`. Résolution de `<id>` depuis `.retro-doc.yml`. (L · reasoning → Opus)
@@ -146,3 +146,7 @@ run incrémental (git diff)  → logique du plan #2 inchangée, s'applique aux e
 ### Session 2026-11-03
 - ✅ Fait : analyse comparative retrodoc-run (Damien) vs retro-doc ; cadrage ; création issue #3 + plan.
 - 📋 Prochain : implémentation (Lot A puis Lot B, étapes 2→5).
+
+### Session 2026-11-03 (suite)
+- ✅ Étape 1 (Lot A) : checklist self-check researcher ajoutée dans `SKILL.md` (Step 4, item 2) et `references/delegation.md` (Delegation protocol, item 3). 4 items : couverture périmètre, `source`+`confidence`, pas d'invention, hygiène vendored/build.
+- 📋 Prochain : Étape 2 (Lot B) — schéma cache v2 avec `entities[].status` (M · reasoning → Opus).
