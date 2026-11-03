@@ -36,6 +36,15 @@ v1 upgrades transparently on its next run.
 | `sources` | list | `file:line` or `file:start-end` anchors that feed this entity. Drives invalidation (a changed source invalidates the entity) and the targeted re-read of low-confidence claims. |
 | `deps` | list | Ids of entities this one depends on. Drives one-level invalidation propagation. |
 | `confidence` | `high` \| `low` | Aggregate confidence of the entity's claims. |
+| `description` | string | One-line human description. Always present — the only substantive field a `catalogued` entity carries. |
+| `status` | `catalogued` \| `generated` | Lifecycle state (v2). `catalogued` = inventoried only (`id` + `description`, no docs written); `generated` = full Reference/Explanation produced. |
+
+> **Status retro-compatibility.** An entity with **no** `status` in an existing v2
+> cache is read as `generated` (the pre-catalogue behaviour), so earlier v2 caches
+> that documented every entity upgrade transparently. A `catalogued` entity carries
+> only `id`, `status`, and `description`; `quadrants`, `docs`, `sources`, `deps` and
+> `confidence` are populated when it is expanded to `generated` (see `SKILL.md`
+> Step 3 — catalogue vs expand).
 
 ## Example
 
@@ -46,6 +55,8 @@ schema_version: 2
 source_sha: a1b2c3d          # SHA of the last successful run
 entities:
   - id: metering-service
+    status: generated
+    description: Usage metering and quota enforcement.
     quadrants: [reference, explanation]
     docs:
       reference: reference-metering-service.md
@@ -55,6 +66,9 @@ entities:
       - metering/usage.js:1-88
     deps: [auth-middleware]
     confidence: high
+  - id: auth-middleware            # catalogued only — minimal shape, no docs yet
+    status: catalogued
+    description: Request authentication and session lookup.
 ```
 
 ## Invariants
@@ -65,3 +79,6 @@ entities:
   provenance, `deps` from the entity's `dependencies`.
 - Entity ids are stable across runs so incremental diffs map a changed source
   back to the entity that owns it.
+- A `catalogued` entity carries only `id`, `status`, and `description`; it gains
+  `quadrants`/`docs`/`sources`/`deps`/`confidence` when expanded to `generated`. A
+  v2 entity with no `status` is read as `generated` (retro-compatibility).

@@ -138,15 +138,51 @@ hand-written documentation.
 
 ---
 
-## Step 3 — Regeneration mode (full vs incremental)
+## Step 3 — Run mode (catalogue-first, then full vs incremental)
 
-Before any archaeology, decide whether this run regenerates **everything** or only
-the parts the code changed since the last run. This is what makes repeated runs
-cheap: an unchanged entity is never re-researched and never rewritten. This step
-runs **before** archaeology (Step 4) because the mode decides **which** entities
-the researcher investigates.
+Decide **what this run produces** before any archaeology. Two decisions, in order:
+first catalogue vs expand (the `--expand` flag), then — only inside expand — full
+vs incremental. This is what makes retro-doc cheap: the default run only inventories
+the code, and even an expand re-researches only what changed.
 
-### Decide the mode
+### Catalogue vs expand (decided first)
+
+A run is **catalogue-first by default**. The `--expand` flag decides whether this
+run only inventories the codebase or also writes full docs:
+
+| Prompt | Mode | What the run does |
+|---|---|---|
+| no `--expand` | **CATALOGUE** (default) | Inventory only — no docs written. |
+| `--expand` (bare) or `--expand all` | **EXPAND all** | Generate docs for every `catalogued` entity. |
+| `--expand <id>[,<id>…]` | **EXPAND targeted** | Generate docs only for the named entities. |
+
+**CATALOGUE mode** — the cheap inventory path. It never delegates deep research and
+never writes a Reference or Explanation file:
+
+1. Run the light cartography of Step 4 item 1 (`glob`/`grep` + entry points) only.
+2. Derive **one entity per coherent subsystem**: a stable kebab-case `id` and a
+   one-line `description`. No public-surface listing, no archaeology.
+3. Persist every entity with `status: catalogued` in the v2 cache (Step 9), leaving
+   any already-`generated` entity untouched.
+4. (Re)write the INDEX (Step 8) and the run report, then **STOP** — skip the full vs
+   incremental decision below and Steps 4–7 (deep research and doc writing).
+
+**EXPAND mode** — generate full docs for the targeted entities. Resolve each `<id>`
+against the `entities[]` of `.retro-doc.yml`; a bare `--expand` or `--expand all`
+targets every entity currently `status: catalogued`. For each targeted entity the
+full pipeline runs (Steps 4–9): delegate research, write Reference + Explanation,
+flip its cache entry to `status: generated`, and refresh its INDEX entry. The full
+vs incremental decision below then applies to this expand set.
+
+> **Interaction with the incremental logic.** Full vs incremental only concerns
+> already-`generated` entities: a `catalogued` entity being expanded has nothing
+> written yet to invalidate, so it is always a fresh generation. The `git diff`
+> invalidation below applies to `generated` entities on a later run.
+>
+> **Unknown `--expand <id>`.** If a named id matches no entity in the cache, report
+> it and run the catalogue first so the ids exist — never invent an entity.
+
+### Decide full vs incremental (within EXPAND mode)
 
 Read the cache resolved in Step 1 (`<base>/retro/.retro-doc.yml`):
 
@@ -221,9 +257,10 @@ which returns a provenance-tagged **concept map**. The calling model (the
 of doubtful claims, final writing). See `references/delegation.md` for the two
 roles, the tier → model mapping, and the full output contract.
 
-> **Research scope.** On a **full** run, research every entity in scope. On an
-> **incremental** run (Step 3), research **only the invalidated entities**; reuse
-> every non-invalidated entity's map entry unchanged from the cache.
+> **Research scope.** This step runs in **EXPAND mode only** — a CATALOGUE run
+> (Step 3) skips it entirely. Within expand: on a **full** run research every
+> expanded entity; on an **incremental** run research **only the invalidated
+> entities**; reuse every non-invalidated entity's map entry unchanged from the cache.
 
 > **Writer model recommendation (non-blocking).** The heavy reading is off the
 > writer, so keeping the writer on a `reasoning` model costs only on output —
@@ -404,6 +441,11 @@ incremental runs can reuse the concept map and skip unchanged entities.
    the partition and files written in Steps 5–8. For each entity:
 
    - `id` — kebab-case entity id from the concept map.
+   - `status` — `generated` for an entity whose docs were written this run;
+     `catalogued` for an inventory-only entity (catalogue mode, no docs). Preserve
+     the existing `status` of any entity left untouched this run.
+   - `description` — one-line description (the concept map `purpose`, condensed).
+     Always written, including for `catalogued` entities.
    - `quadrants` — the quadrants produced (from Step 5 partition).
    - `docs` — map of quadrant → filename written under `<base>/retro/`.
    - `sources` — `file:line` provenance anchors from the concept map's claims.
@@ -419,6 +461,8 @@ incremental runs can reuse the concept map and skip unchanged entities.
    source_sha: <HEAD SHA, or omit if not a git repo>
    entities:
      - id: <entity-id>
+       status: generated           # or `catalogued` (inventory only, no docs)
+       description: <one-line>
        quadrants: [reference, explanation]
        docs:
          reference: reference-<slug>.md
@@ -431,10 +475,13 @@ incremental runs can reuse the concept map and skip unchanged entities.
 
    Full field reference: `references/cache-schema.md`.
 
-   **On a full run:** write all entities in scope.
-   **On an incremental run:** rewrite only the invalidated entities' entries; copy
-   the non-invalidated entries unchanged from the previous cache. `source_sha` is
-   set to the current HEAD in both cases.
+   **On a catalogue run** (no `--expand`, Step 3): write one `status: catalogued`
+   entry per inventoried entity (`id` + `description` only), preserving any existing
+   `status: generated` entry unchanged.
+   **On an expand full run:** write all expanded entities with `status: generated`.
+   **On an expand incremental run:** rewrite only the invalidated entities' entries;
+   copy the non-invalidated entries unchanged from the previous cache. `source_sha`
+   is set to the current HEAD in all cases.
 
 4. **Coherence with Step 8 (INDEX):** the entities written here must match exactly
    the entities whose doc files are present under `<base>/retro/`.
@@ -501,7 +548,7 @@ Fix any failure before reporting.
 ```
 retro-doc generated:
   Scope:     <what was documented>
-  Mode:      <full | incremental (K invalidated, N reused)>
+  Mode:      <catalogue (N inventoried) | expand full | expand incremental (K invalidated, N reused)>
   Language:  <lang>  (persisted in <base>/retro/.retro-doc.yml)
   Output:    <base>/retro/  (+ 1 line added to README)
   Files:     <N> new, <M> updated
@@ -526,8 +573,11 @@ Next (yours): review the diff, then commit and push.
 - **Accuracy over everything.** Traceable to code or not stated.
 - **Reference ≠ Explanation ≠ How-to ≠ Tutorial.** Do not mix quadrants.
 - **Default is Reference + Explanation + INDEX.** Tutorial/How-to on request only.
-- **Incremental by default on a v2 cache.** Re-research and rewrite only what the
-  diff invalidated; `full` in the prompt forces a complete run.
+- **Catalogue-first.** A run with no `--expand` only inventories the code
+  (`status: catalogued`, no docs). `--expand <id>|all` generates full docs and
+  flips the targeted entities to `status: generated`.
+- **Incremental by default on a v2 cache.** Within expand, re-research and rewrite
+  only what the diff invalidated; `full` in the prompt forces a complete run.
 - **Dedicated output dir.** Generated files stay under `<base>/retro/`.
 - **One language per project, asked once, persisted.**
 - **Never commit or push.** Write files, scan for secrets, report, stop.
