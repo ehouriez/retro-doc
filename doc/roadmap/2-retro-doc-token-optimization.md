@@ -55,13 +55,37 @@ reste 100 % prompt-only.
 ## Étapes
 
 - [ ] Étape 1 — Schéma `.retro-doc.yml` étendu (`language`, `source_sha`, `entities[]{sources[file:line], deps[], confidence, quadrants}`) + extension `allowed-tools` (`Agent`/`Task`) + doc du format cache dans `references/` (M · reasoning → Opus)
-- [ ] Étape 2 — Step 3 refondu : délégation à un sous-agent `general-purpose` configurable, cartographie légère intégrée, parallélisme adaptatif au scope, contrat de sortie = concept map à provenance, fallback inline si `Agent` indisponible (L · reasoning → Opus)
+- [ ] Étape 2 — Step 3 refondu : délégation à un sous-agent `general-purpose` configurable (`Agent` frais avec override `model` vers le tier `standard`, **jamais un `fork`** qui hériterait du contexte et ignorerait l'override), cartographie légère intégrée, parallélisme adaptatif au scope, contrat de sortie = concept map à provenance, fallback inline si `Agent` indisponible. Documenter les **deux rôles** (rédacteur / chercheur) et émettre une **recommandation non bloquante** : rédacteur en tier `reasoning` (L · reasoning → Opus)
 - [ ] Étape 3 — Persistance du cache enrichi en fin de run (map + SHA courant) dans `.retro-doc.yml`, cohérence avec Step 7 (INDEX) et Step 9 (stop) (S · standard → Sonnet)
 - [ ] Étape 4 — Régénération incrémentale : lecture cache + SHA, `git diff <sha>..HEAD`, défaut incrémental si cache présent, mots-clés `full`/`incrémental`, rétrocompat = full forcé si cache v1 (M · reasoning → Opus)
 - [ ] Étape 5 — Invalidation par entité + propagation aux dépendants directs (1 niveau) depuis le graphe `deps` du map (M · reasoning → Opus)
-- [ ] Étape 6 — Garde-fou qualité : marquage `confidence` par claim par le sous-agent, re-lecture ciblée par le rédacteur (reasoning) sur les claims incertains avant écriture (S · reasoning → Opus)
+- [ ] Étape 6 — Garde-fou qualité : marquage `confidence` par claim par le sous-agent, re-lecture ciblée par le **rédacteur lui-même** (le modèle appelant, pas une gate ni un sous-agent) via ses propres `Read`/`Grep` sur les `file:line` des claims `confidence: low`, avant écriture. Interne au run, silencieux, sans interaction utilisateur (S · reasoning → Opus)
 - [ ] 🧪 Tests — Rédiger et exécuter la procédure de validation (3 scénarios : neuf, rétrocompat, incrémental sur diff)
 - [ ] ✅ Validation — Vérifier les résultats et clôturer
+
+## Rôles et modèles
+
+Le skill fait collaborer **deux rôles** portés par **deux modèles distincts** :
+
+| Rôle | Qui l'exécute | Tier | Responsabilité |
+|---|---|---|---|
+| **Rédacteur** | Le modèle qui exécute `/retro-doc` (le modèle **appelant**, déjà actif) | `reasoning` recommandé | Partition Diataxis, arbitrage des claims `confidence: low`, prose Explanation (trade-offs, rationale), écriture finale |
+| **Chercheur** | Sous-agent `general-purpose` lancé via le tool `Agent` (modèle surchargé) | `standard` | Cartographie + lecture lourde du code, production du concept map à provenance `file:line` |
+
+**Pourquoi le rédacteur devrait très souvent être `reasoning`** : la lecture
+exhaustive du code (poste de tokens dominant) est **déjà déportée** sur le
+chercheur `standard`. Garder le rédacteur en `reasoning` ne pèse donc que sur
+l'**output** (poste mineur), précisément là où le jugement paie :
+
+1. Le chercheur renvoie le map ; chaque claim porte un `confidence` et sa provenance `file:line`.
+2. Le rédacteur parcourt le map et, pour les seuls claims `confidence: low`, relit lui-même quelques lignes via `Read`/`Grep` sur les `file:line` concernés (re-lecture **ciblée**, pas le fichier entier).
+3. Il écrit la doc à partir du map corrigé.
+
+Tout est **interne au run**, automatique et silencieux : **aucune gate, aucun
+`/model`, aucune `AskUserQuestion`**. Le skill ne peut pas forcer un changement
+de modèle (action IDE) — il **recommande** `reasoning` pour le rédacteur sans
+bloquer, et reste fonctionnel si le rédacteur est `standard` (qualité moindre
+sur l'arbitrage des claims douteux).
 
 ## Décisions techniques
 
@@ -76,6 +100,8 @@ reste 100 % prompt-only.
 | Déclenchement régén | Défaut incrémental si cache présent ; mots-clés `full` / `incrémental` dans le prompt | Pas d'interruption systématique ; pilotable |
 | Rétrocompat | Cache v1 (langue seule) → full forcé + écriture du cache enrichi | Transparent, aucune casse sur un projet déjà documenté |
 | Garde-fou qualité | Confiance + re-lecture ciblée du rédacteur sur les claims incertains | Équilibre coût/fiabilité ; qualité ≥ v1 |
+| Modèle du rédacteur | Recommandé `reasoning` (non bloquant) ; le skill reste agnostique | Le rédacteur arbitre les claims douteux + produit la prose Explanation et la partition Diataxis — jugement où `reasoning` paie ; la lecture lourde étant déportée sur le chercheur `standard`, ça ne pèse que sur l'output (poste mineur) |
+| Mécanisme de délégation | `Agent` frais `general-purpose` + override `model`, jamais un `fork` | Un `fork` hérite du contexte du parent (ruine l'économie) et ignore l'override `model` |
 | Dégradation | Fallback inline (= comportement v1) si tool `Agent` indisponible | Robustesse multi-IDE ; préserve le prompt-only |
 
 ## Tests
@@ -89,4 +115,5 @@ reste 100 % prompt-only.
 
 ### Session 2026-11-03
 - ✅ Fait : cadrage complet (8 décisions d'architecture + 4 décisions de frontier), issue #2 créée, plan créé.
+- ✅ Fait : section « Rôles et modèles » ajoutée (rédacteur appelant `reasoning` recommandé / chercheur sous-agent `standard`), clarification du garde-fou #6 (re-lecture par le rédacteur lui-même, sans gate), décisions `Modèle du rédacteur` et `Mécanisme de délégation` ajoutées.
 - 📋 Prochain : implémentation (Lot 1 → Lot 4), puis tests 3 scénarios sur auxitum.
