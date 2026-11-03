@@ -218,10 +218,101 @@ FIN (full ou incrémental) :
 
 ## Tests
 
-> Section renseignée à l'étape 🧪 Tests. Procédure, résultats attendus et
-> résultats réellement joués seront écrits ici (source de vérité traçable).
-> Validation manuelle sur `auxitum` en 3 scénarios (neuf, rétrocompat,
-> incrémental sur diff) par renommage de `doc/retro`.
+> Validation manuelle sur `auxitum` en 3 scénarios. Les exécutions `/retro-doc`
+> se font dans une session Claude Code ouverte sur `auxitum` (rédacteur en tier
+> `reasoning` recommandé). Les renommages et vérifications sont des commandes
+> opérateur (bloc bash). Source de vérité : cette section.
+
+### Prérequis pour les tests
+
+- Skill `retro-doc` **v2 implémenté et installé** (plan #2 terminé) avant de tester.
+- `auxitum` cloné en `/mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum`, branche `dev`, working tree propre.
+- `auxitum/doc/retro/` v1.0.0 **présent et commité** (généré par le run v1, poussé sur `dev`).
+- `claude` CLI disponible ; scope de doc identique au run v1 pour comparabilité : **module metering**.
+- ⚠️ **Décision à confirmer (étape 4)** : la base de diff incrémental est `source_sha..HEAD` → le scénario 3 **commite** le marqueur pour que HEAD avance. Si l'implémentation choisit de couvrir aussi les modifs working-tree non commitées, adapter le scénario 3.
+
+### Procédure de test
+
+**Scénario 1 — projet neuf (pas de cache) :**
+
+```bash
+echo "=== Go To auxitum ==="
+cd /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum
+
+echo "=== Backup The v1 retro-doc Output ==="
+mv doc/retro doc/retro.bak
+```
+
+Puis, dans une session Claude Code sur `auxitum` :
+
+```
+/retro-doc documente le module de metering
+```
+
+```bash
+echo "=== Check Fresh Output And v2 Cache ==="
+ls doc/retro/
+cat doc/retro/.retro-doc.yml
+```
+
+**Scénario 2 — projet déjà documenté par la v1 (rétrocompat) :**
+
+```bash
+echo "=== Keep The Fresh v2 Output Aside ==="
+mv doc/retro doc/retro.new
+
+echo "=== Restore The v1 Output As Current ==="
+mv doc/retro.bak doc/retro
+```
+
+Puis, dans la session Claude Code :
+
+```
+/retro-doc documente le module de metering
+```
+
+```bash
+echo "=== Check The v1 Cache Was Upgraded To v2 ==="
+cat doc/retro/.retro-doc.yml
+```
+
+**Scénario 3 — incrémental réel (sur un cache v2) :**
+
+```bash
+echo "=== Pick One Documented Source File (adapt FILE to a path listed under entities[].sources of doc/retro/.retro-doc.yml; server.js was documented by the v1 run) ==="
+FILE="server.js"
+
+echo "=== Append A Revertible Marker And Commit It So HEAD Advances ==="
+printf '\n// retro-doc incremental test marker\n' >> "$FILE"
+git add "$FILE"
+git commit -m "test: retro-doc incremental marker"
+```
+
+Puis, dans la session Claude Code :
+
+```
+/retro-doc documente le module de metering
+```
+
+```bash
+echo "=== Check Only The Touched Entity Was Regenerated And source_sha Advanced ==="
+git -C /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum status --short doc/retro/
+cat doc/retro/.retro-doc.yml
+
+echo "=== Revert The Marker ==="
+git reset --hard HEAD~1
+```
+
+**Résultats attendus :**
+- **S1** : `doc/retro/` recréé avec `reference-*` / `explanation-*` / `INDEX.md` ; `.retro-doc.yml` en `schema_version: 2` avec `source_sha` et `entities[]` peuplé.
+- **S2** : le skill **signale un cache v1** (pas de `schema_version`) → **run complet forcé**, puis `.retro-doc.yml` réécrit en `schema_version: 2` avec `source_sha` + `entities[]`.
+- **S3** : le skill annonce un **run incrémental** ne re-recherchant que l'entité dont `FILE` est une source (+ ses dépendants directs) ; seules les docs de cette entité sont modifiées (les autres intactes) ; `source_sha` = nouveau HEAD. Après revert, working tree propre.
+- Transverses : aucun commit auto par le skill ; scan secrets propre ; exactitude `file:line` ≥ v1.
+
+### Résultats joués et vérifiés
+
+| Date | Test | Attendu | Observé | Verdict |
+|------|------|---------|---------|---------|
 
 ## Journal de session
 
@@ -229,4 +320,5 @@ FIN (full ou incrémental) :
 - ✅ Fait : cadrage complet (8 décisions d'architecture + 4 décisions de frontier), issue #2 créée, plan créé.
 - ✅ Fait : section « Rôles et modèles » ajoutée (rédacteur appelant `reasoning` recommandé / chercheur sous-agent `standard`), clarification du garde-fou #6 (re-lecture par le rédacteur lui-même, sans gate), décisions `Modèle du rédacteur` et `Mécanisme de délégation` ajoutées.
 - ✅ Fait : section « Contexte d'implémentation (auto-portant) » ajoutée (état de départ, invariants, schéma `.retro-doc.yml` v2, contrat du concept map, protocole de délégation, algo de régénération, mapping steps, reprise) — le plan est désormais implémentable par un agent frais post-`/clear`.
-- 📋 Prochain : implémentation (Lot 1 → Lot 4), puis tests 3 scénarios sur auxitum.
+- ✅ Fait : procédure de tests écrite (section `## Tests`) — 3 scénarios sur auxitum (neuf / rétrocompat / incrémental réel avec commit du marqueur + revert). Décision « base de diff incrémental » signalée à confirmer à l'étape 4.
+- 📋 Prochain : implémentation (Lot 1 → Lot 4), puis exécution des tests 3 scénarios sur auxitum.
