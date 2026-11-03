@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: Emmanuel Houriez
-  version: "2.1.0"
+  version: "2.2.0"
 allowed-tools:
   - Bash
   - Read
@@ -407,9 +407,13 @@ templates in `references/templates.md`. Otherwise skip them.
 
 After writing the docs:
 
-1. **Write `<base>/retro/INDEX.md`** listing every generated document with its
-   Diataxis quadrant and a one-line description (use the INDEX template).
-2. **Cross-link quadrants.** Each Reference links to its Explanation and back.
+1. **Write `<base>/retro/INDEX.md`** — list **every entity** (generated and
+   catalogued) from the v2 cache, with a status marker and a description. Use the
+   INDEX template in `references/templates.md`. ✅ for `generated` entities (docs
+   linked inline); ⬜ for `catalogued` entities (docs column shows `—`). The INDEX
+   is **always fully regenerated** on every run — catalogue runs as well as expand.
+2. **Cross-link quadrants.** Each Reference links to its Explanation and back
+   (applies to `generated` entities only — `catalogued` entities have no docs yet).
 3. **Link from the project README.** Add (or update) a single line pointing to
    `<base>/retro/INDEX.md`, under a "Documentation" heading. This is the **only**
    write outside `<base>/retro/`. If the user declines README edits, say so and
@@ -421,8 +425,10 @@ After writing the docs:
    grep -rhoE "\]\(([^)]+\.md)\)" <base>/retro/ | sort -u
    ```
 
-> **Incremental runs:** regenerate only the INDEX entries for invalidated entities;
-> leave all other entries intact.
+> **All run types (catalogue, expand full, expand incremental):** always
+> regenerate the full INDEX — entity statuses change across runs (new
+> `catalogued` entries, `catalogued` → `generated` flips) and a partial
+> regeneration would leave the dashboard stale.
 
 ---
 

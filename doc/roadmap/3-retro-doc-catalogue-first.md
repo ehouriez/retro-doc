@@ -82,7 +82,7 @@ modèle figé en frontmatter.
 - [x] Étape 2 — **Lot B** : étendre le schéma de cache v2 avec `entities[].status` ∈ {`catalogued`, `generated`}. Rétrocompat : entité sans `status` dans un cache v2 existant → traitée comme `generated` (comportement actuel). Documenter dans `references/cache-schema.md` + étape « Cache persistence » de `SKILL.md`. (M · reasoning → Opus)
 - [x] Étape 3 — **Lot B** : mode **catalogue par défaut**. Un run sans `--expand` produit l'inventaire : cartographie légère (glob/grep, déjà faite en étape 4) → une entité par sous-système avec `id` + une ligne de description, **sans déléguer l'archéologie profonde** et **sans écrire de fiches**. Persister chaque entité `status: catalogued`. Écrire/mettre à jour l'INDEX. Décrire ce branchement dans `SKILL.md` (étape 3 « Regeneration mode » ou nouvelle sous-section amont). (L · reasoning → Opus)
 - [x] Étape 4 — **Lot B** : flag `--expand <id>` et `--expand all` (défaut si le flag est absent OU donné sans argument). Pour chaque entité ciblée : déléguer la recherche (researcher Sonnet, inchangé), écrire Reference + Explanation, basculer `status: generated`, mettre à jour le cache et l'INDEX. `--expand all` = affine toutes les entités `catalogued`. Résolution de `<id>` depuis `.retro-doc.yml`. (L · reasoning → Opus)
-- [ ] Étape 5 — **Lot B** : rendu INDEX listant **toutes** les entités (générées ET cataloguées) avec marqueur ✅ générée / ⬜ cataloguée, par quadrant/sous-système. L'INDEX reste régénéré à chaque run (catalogue comme expand). Dans `SKILL.md` (étape INDEX). (M · standard → Sonnet)
+- [x] Étape 5 — **Lot B** : rendu INDEX listant **toutes** les entités (générées ET cataloguées) avec marqueur ✅ générée / ⬜ cataloguée, par quadrant/sous-système. L'INDEX reste régénéré à chaque run (catalogue comme expand). Dans `SKILL.md` (étape INDEX). (M · standard → Sonnet)
 - [ ] 🧪 Tests — Rédiger et exécuter la procédure de test (avant-dernière étape, obligatoire)
 - [ ] ✅ Validation — Vérifier les résultats des tests et clôturer (dernière étape, obligatoire)
 
@@ -117,24 +117,74 @@ run incrémental (git diff)  → logique du plan #2 inchangée, s'applique aux e
 
 ## Tests
 
-> Section renseignée aux étapes de tests. Procédure, résultats attendus et
-> résultats réellement joués seront écrits ici (source de vérité traçable).
-> Projet cible de test : `/mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum` (déjà utilisé
-> pour les tests du plan #2).
+> Projet cible : `/mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum`.
 
 ### Prérequis pour les tests
 
 ```bash
-(à compléter à l'étape 🧪 Tests)
+echo "=== Retro-doc Skill Path ==="
+SKILL_PATH=/mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/SKILL.md
+
+echo "=== Target Project ==="
+TARGET=/mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum
+
+echo "=== Cache File Path ==="
+CACHE=$TARGET/docs/retro/.retro-doc.yml
 ```
 
 ### Procédure de test
 
+**Bloc A — Lot A : self-check researcher (régression)**
+
 ```bash
-(à compléter à l'étape 🧪 Tests)
+echo "=== Verify Self-check Present In SKILL.md Step 4 ==="
+grep -n "Self-check" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/SKILL.md
+
+echo "=== Verify Self-check In delegation.md ==="
+grep -n "Self-check\|self-check" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/references/delegation.md
 ```
 
-**Résultats attendus :** (à compléter)
+**Bloc B — Lot B : cache v2 schema (régression)**
+
+```bash
+echo "=== Verify Status Field In cache-schema.md ==="
+grep -n "status.*catalogued\|catalogued.*generated" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/references/cache-schema.md
+
+echo "=== Verify Status Field In SKILL.md Step 9 ==="
+grep -n "status.*catalogued\|catalogued.*generated" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/SKILL.md
+```
+
+**Bloc C — Lot B : catalogue-first (régression + INDEX ✅/⬜)**
+
+```bash
+echo "=== Verify Catalogue Mode In SKILL.md Step 3 ==="
+grep -n "CATALOGUE\|catalogue" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/SKILL.md | head -20
+
+echo "=== Verify expand Flag In SKILL.md ==="
+grep -n "\-\-expand" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/SKILL.md | head -20
+```
+
+**Bloc D — Étape 5 : rendu INDEX ✅/⬜**
+
+```bash
+echo "=== Verify INDEX Template In templates.md ==="
+grep -n "Status\|✅\|⬜" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/references/templates.md
+
+echo "=== Verify Step 8 Lists All Entities ==="
+grep -n "every entity\|generated and\|catalogued\|always fully regenerated" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/SKILL.md
+
+echo "=== Verify Regeneration Rule Covers All Run Types ==="
+grep -A3 "All run types" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/SKILL.md
+```
+
+**Résultats attendus :**
+- Bloc A : `grep` retourne au moins une ligne contenant "Self-check" dans SKILL.md Step 4 et dans delegation.md
+- Bloc B : `grep` retourne des lignes contenant `status: catalogued` et la valeur `generated` dans les deux fichiers
+- Bloc C : `grep` retourne les mots `CATALOGUE` et `--expand` dans SKILL.md
+- Bloc D :
+  - `templates.md` : lignes contenant `Status`, `✅`, `⬜` dans le template INDEX
+  - `SKILL.md` : phrases « every entity », « generated and », « catalogued », « always fully regenerated » présentes dans Step 8
+  - `SKILL.md` : bloc « All run types » présent avec explication de la régénération complète
 
 ### Résultats joués et vérifiés
 
@@ -157,3 +207,7 @@ run incrémental (git diff)  → logique du plan #2 inchangée, s'applique aux e
 - ✅ Étape 4 : flag `--expand <id>[,<id>…]` / `--expand all` / `--expand` nu (= all) documenté dans la même sous-section ; résolution de `<id>` via `.retro-doc.yml`, bascule `generated`, note interaction avec l'incrémental (plan #2) et cas `<id>` inconnu. Règle dure « Catalogue-first » + ligne `Mode:` du rapport (Step 11) mises à jour.
 - ℹ️ `references/delegation.md` volontairement non modifié : le researcher reste inchangé (catalogue ne délègue pas ; expand réutilise le contrat existant).
 - 📋 Prochain : Étape 5 (rendu INDEX ✅/⬜, hors de la demande courante), puis 🧪 Tests contre auxitum.
+
+### Session 2026-11-03 (étape 5)
+- ✅ Étape 5 : `SKILL.md` Step 8 mis à jour — INDEX liste désormais toutes les entités (générées + cataloguées) avec marqueurs ✅/⬜, colonne « Docs » avec liens pour les générées et `—` pour les cataloguées, régénération complète à chaque run (catalogue comme expand). Note « Incremental runs » remplacée par une note couvrant tous les types de run. `references/templates.md` template INDEX aligné (nouvelle table `Status | Entity | Docs | Description`, légende ✅/⬜ dans le bloc `>`).
+- 📋 Prochain : 🧪 Tests contre auxitum, puis ✅ Validation + clôture.
