@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: Emmanuel Houriez
-  version: "2.2.1"
+  version: "2.2.2"
 allowed-tools:
   - Bash
   - Read
@@ -588,6 +588,19 @@ retro-doc generated:
   Quality:      accuracy / completeness / voice gates passed
 Next (yours): review the diff, then commit and push.
 ```
+
+   If any entities remain `status: catalogued` after this run, append:
+
+   ```
+   Still to document (⬜ catalogued, docs not yet generated):
+     ⬜ <id-1>   — <one-line description>
+     ⬜ <id-2>   — <one-line description>
+     …
+
+   Next: generate their docs with --expand
+     All remaining:  /retro-doc --expand all
+     Targeted:       /retro-doc --expand <id-1>,<id-2>
+   ```
 
 ---
 
