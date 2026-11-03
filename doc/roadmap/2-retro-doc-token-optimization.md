@@ -435,6 +435,47 @@ git reset --hard HEAD~1
 - **S5** : le skill annonce un run **incrémental** ; **seules** les docs de l'entité dont `streamProxy.js` est une source **ET de ses dépendants directs** sont réécrites (`git status` doit montrer ce sous-ensemble précis, pas toutes les entités) ; les entités sans lien restent intactes ; `source_sha` = nouveau HEAD. Après revert + checkout, working tree propre.
 - **Mesure délégation (transverse)** : sur S4 (gros scope), comparer le coût/contexte au mono-entité. Si le gain délégation existe, il doit apparaître ici (lecture fraîche moins cache-dominée). Sinon, l'hypothèse #2 est infirmée même sur gros scope → trancher l'archi.
 
+#### Procédure de test — comparatif pleine rétro-doc v1 vs v2 (S6)
+
+> Objectif : **le seul vrai comparatif de coût** — rejouer le prompt exact du run
+> v1.0.0 (« documente tout le projet en français », mesuré à **$22.48** en v1,
+> valeur fournie par l'utilisateur) sur la v2, scope maximal où la délégation peut
+> le plus payer.
+
+```bash
+echo "=== Go To auxitum ==="
+cd /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum
+
+echo "=== Preserve The S5 Output Aside ==="
+mkdir -p doc.bak
+mv doc/retro doc.bak/retro.scenario.5
+
+echo "=== Confirm doc/retro Is Absent So S6 Starts Fresh (full run) ==="
+ls doc/retro 2>/dev/null || echo "doc/retro absent — ready for a clean full project run"
+```
+
+Dans une session Claude Code sur `auxitum` (**même modèle rédacteur que le run v1**) :
+
+```
+/retro-doc documente tout le projet en français
+```
+
+```bash
+echo "=== Count Entities And Docs Produced ==="
+ls doc/retro/ | grep -cE '^(reference|explanation)-'
+grep -c '^  - id:' doc/retro/.retro-doc.yml
+```
+
+**Résultats attendus / à relever S6 :**
+- Coût + durée du run v2, à mettre en regard du **$22.48 v1**.
+- **⚠️ Confond à lever** : la ligne `Total Cost` de Claude Code inclut-elle les
+  tokens des sous-agents Sonnet ? Si non, le total réel = ligne session + coût des
+  chercheurs (à lire côté facturation API). v1 n'avait pas de sous-agent → son
+  $22.48 est tout-compris ; la comparaison n'est honnête qu'à périmètre de coût égal.
+- Nombre d'entités/docs produits en v2 vs v1 (volume comparable ?).
+- État du code identique au run v1 ? (auxitum a évolué → biais possible à noter).
+- `deps` peuplé sur plusieurs entités (confirmation à grande échelle).
+
 ### Résultats joués et vérifiés
 
 | Date | Test | Attendu | Observé | Verdict |
@@ -446,6 +487,9 @@ git reset --hard HEAD~1
 | 2026-11-03 | Délégation (transverse, bloquant) | archéologie déléguée à un sous-agent Sonnet, writer Opus = orchestration/écriture seule | writer **Opus a fait l'archéologie INLINE** (« petit périmètre cohérent → lecture directe, pas de sous-agent ») → économie de tokens défaite | ❌ |
 | 2026-11-03 | Délégation (re-test post-fix) | sous-agent Sonnet lancé même sur petit scope ; writer ne lit pas le code | `Agent(Research metering) Sonnet 4.6` **lancé** ; writer Opus : orchestration + re-lecture ciblée de 5 claims + écriture (a détecté du dead code) — $3.41 / 6m59 | ✅ |
 | 2026-11-03 | Gain de coût réel (full, post-fix) | coût writer full ↓ vs baseline inline | **coût inchangé** ($3.41 vs $3.41/$3.66) malgré délégation effective — hypothèse du gain non démontrée (voir Observation 5) | ❌ |
+| 2026-11-03 | S4 gros scope full | ≥ 3-4 entités, `deps` peuplé, délégation parallèle | **6 entités** ; `deps` peuplé entre entités (`agentic-orchestration`→[tool-call-parsing, verification, llm-support], `llm-proxy-route`→[stream-proxy, agentic-orchestration, verification, llm-support], `verification`→[agentic-orchestration, llm-support]) ; **4 chercheurs Sonnet parallèles** lancés — $10.51 / 17m32 | ✅ |
+| 2026-11-03 | S5 propagation (étape 5, test clé) | entité touchée + dépendants directs invalidés, autres intacts | marker sur `streamProxy.js` → **stream-proxy (direct) + llm-proxy-route (via `deps`) invalidés** ; 4 autres entités intactes ; re-recherche des 2 invalidées ; `git status` = seuls `reference-/explanation-stream-proxy.md` réécrits + `.retro-doc.yml`, `source_sha` avancé | ✅ |
+| 2026-11-03 | S5 rewrite dépendant (nuance) | doc du dépendant réécrite si nécessaire | llm-proxy-route re-recherché mais **non réécrit** : la re-recherche a confirmé que le changement de stream-proxy était cosmétique (commentaire) → pas d'invention. Correct **ici** ; non testé sur changement sémantique | ⚠️ |
 
 ### Analyse comparative des runs (2026-11-03)
 
@@ -459,6 +503,7 @@ S1/S2, le **même SHA** (`89ac41b`) — ils sont donc directement comparables.
 | S2 rétrocompat | 7m58 | $3.66 | 3 247 252 → 27 758 (∑ 3 171 850) | 12 | `[]` | ❓ non confirmé |
 | S3 incrémental | **1m23** | **$1.27** | 621 881 → 5 003 (∑ 507 723) | 13 (inchangé) | `[]` | non (no-op) |
 | Re-test S1 (post-fix délég.) | 6m59 | $3.41 | 3 030 599 → 28 644 (∑ 2 858 967) | 14 | `[]` | **oui, Sonnet (confirmé)** |
+| S4 gros scope (6 entités) | 17m32 | $10.51 | 9 615 650 → 104 737 (∑ 9 240 764) | 27 (6 entités) | **peuplé** | **oui, 4 Sonnet // (confirmé)** |
 
 > 🤔 **Hypothèse** sur le format `X → Y (∑ Z)` : `X` = contexte cumulé en entrée,
 > `Y` = tokens générés, `Z` = part lue depuis le cache (sous-ensemble de `X`).
@@ -550,9 +595,11 @@ writer Opus n'a pas lu le code (orchestration + re-lecture ciblée + écriture).
 régression bloquante est levée. Verdict délégation : ✅.
 
 **Pistes restées ouvertes (ne bloquent pas la délégation, mais à trancher avant clôture)** :
-- **Gain de coût non démontré** : le coût full est resté identique malgré la délégation (voir `### Analyse comparative § Observation 5`). Cause probable : facturation cache-dominée (94 % cache-read) rendant le tier du lecteur quasi neutre. ❓ À confirmer : la ligne `Total Cost` de Claude Code inclut-elle le sous-agent ?
-- **`deps: []` est correct** sur scope mono-entité (deps = ids d'entités documentées ; une seule entité ⇒ vide). Le `deps` peuplé du run hang était erroné (noms de modules). → voir Observation 4.
-- **Étape 5 (propagation 1-niveau) non testée** : le scope mono-entité `metering` ne peut pas l'exercer. Lacune de couverture — nécessite un **scope multi-entités**.
+- **Gain de coût non démontré** : le coût full est resté identique malgré la délégation (voir `### Analyse comparative § Observation 5`). Cause probable : facturation cache-dominée (94-96 % cache-read) rendant le tier du lecteur quasi neutre. ❓ À confirmer : la ligne `Total Cost` de Claude Code inclut-elle le sous-agent ? **Reste ouvert même après S4** (gros scope, 96 % cache, pas de baseline inline comparable).
+- **`deps: []` est correct** sur scope mono-entité ⇒ **confirmé par S4** : sur scope multi-entités, `deps` se peuple bien avec des ids d'entités. Le `deps` peuplé du run hang mono-entité était erroné (noms de modules). → voir Observation 4.
+- **✅ Étape 5 (propagation 1-niveau) PROUVÉE par S5** : marker sur `streamProxy.js` → `stream-proxy` invalidé directement, `llm-proxy-route` invalidé par propagation `deps` (1 niveau), 4 autres entités intactes. Détection + re-recherche des invalidées = nominal. **Nuance (⚠️)** : le dépendant propagé (`llm-proxy-route`) a été re-recherché puis **non réécrit** car le changement de sa dépendance était cosmétique — comportement correct ici (pas d'invention), mais le cas d'un changement **sémantique** d'une dépendance (où la doc du dépendant devrait vraiment bouger) **n'est pas testé**. Limitation résiduelle à documenter.
+
+**Observation transverse (cross-skill, hors #2)** : le hook `PreToolUse` de **roadmap-tracking** a bloqué la 1ʳᵉ écriture du run retro-doc sous `auxitum/doc/retro/` (auxitum a son propre `doc/roadmap/`) — le run a dû invoquer roadmap-tracking à chaud pour débloquer, puis réémettre. retro-doc écrit de la **doc**, pas du code : l'interférence est gênante mais **ne relève pas de #2** (comportement du hook roadmap-tracking). Candidat à une issue séparée (ex. exclure `doc/retro/` des écritures interceptées, comme `doc/roadmap/` l'est déjà).
 
 ## Journal de session
 
@@ -582,3 +629,11 @@ régression bloquante est levée. Verdict délégation : ✅.
 - ✅ Re-test délégation OK (run `f8058b23`) : sous-agent Sonnet lancé sur petit scope, writer Opus ne lit plus le code, garde-fou étape 6 a détecté du dead code. Régression bloquante **levée**.
 - ⚠️ Finding stratégique (Observation 5) : coût full **inchangé** ($3.41) malgré délégation effective → facturation cache-dominée (94 %) neutralise le tier du lecteur. Le gain mesurable réel = **l'incrémental** (S3, −63 %), pas la délégation. Le scope de test (3 fichiers) est trop petit pour que la délégation paie. 2 points ouverts avant clôture : mesure délégation sur gros scope + test étape 5 (propagation, nécessite multi-entités).
 - 📋 Prochain : décision utilisateur — test multi-entités/gros scope, ou clôture avec caveats.
+
+### Session 2026-11-03 (tests gros scope S4/S5)
+- ✅ S4 (full, sous-système LLM) : **6 entités**, `deps` peuplé entre entités, **4 chercheurs Sonnet en parallèle** (parallélisme adaptatif confirmé) — $10.51 / 17m32. Confirme que `deps` se peuple sur multi-entités (Observation 4 validée).
+- ✅ S5 (incrémental, marker sur `streamProxy.js`) : **étape 5 prouvée** — `stream-proxy` invalidé en direct + `llm-proxy-route` par propagation `deps` 1-niveau ; 4 autres entités intactes ; re-recherche des 2 invalidées ; seul `stream-proxy` réécrit (enrichi de 4 faits réels), `llm-proxy-route` laissé car re-recherche = changement cosmétique.
+- ⚠️ Nuance S5 : le rewrite d'un dépendant propagé sur un changement **sémantique** (vs cosmétique) n'est pas testé. Limitation documentée (Diagnostic).
+- ⚠️ Gain de coût délégation **toujours non démontré** même sur gros scope (96 % cache-read, pas de baseline inline). Le vrai gain prouvé reste l'**incrémental**.
+- 🐛 Cross-skill (hors #2) : le hook `PreToolUse` de roadmap-tracking a bloqué la 1ʳᵉ écriture de retro-doc sous `auxitum/doc/retro/`. Candidat issue séparée.
+- 📋 Prochain : décision clôture (toutes étapes livrées + testées) vs. traitement des 2 limitations résiduelles.
