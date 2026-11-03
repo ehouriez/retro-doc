@@ -16,5 +16,14 @@
     "title": "[⚡] Plan #2 - retro-doc token optimization",
     "deps": [],
     "path": "done/2-retro-doc-token-optimization.md"
+  },
+  {
+    "id": "3",
+    "status": "active",
+    "priority": "high",
+    "complexity": "L",
+    "title": "[🗂️] Plan #3 - retro-doc catalogue-first mode + researcher self-check",
+    "deps": [],
+    "path": "3-retro-doc-catalogue-first.md"
   }
 ]

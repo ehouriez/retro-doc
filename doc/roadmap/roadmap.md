@@ -6,4 +6,8 @@
 
 ## À faire
 
-_Aucun plan actif._
+### [Issue: #3] [🗂️] Plan #3 - retro-doc catalogue-first mode + researcher self-check [PRIORITÉ: HAUTE] [Complexité: L] 🟢
+
+Plan : [`3-retro-doc-catalogue-first.md`](3-retro-doc-catalogue-first.md)
+
+---
