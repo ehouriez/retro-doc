@@ -319,6 +319,99 @@ dépendances réelles.
 - **S3** : le skill annonce un **run incrémental** ne re-recherchant que l'entité dont `FILE` est une source (+ ses dépendants directs) ; seules les docs de cette entité sont modifiées (les autres intactes) ; `source_sha` = nouveau HEAD. Après revert, working tree propre.
 - Transverses : aucun commit auto par le skill ; scan secrets propre ; exactitude `file:line` ≥ v1.
 
+### Procédure de test — gros scope multi-entités (S4, S5)
+
+> Objectif : combler les 2 trous laissés par le scope mono-entité `metering` —
+> (a) **exercer l'étape 5** (propagation 1-niveau, impossible à une seule entité),
+> (b) **mesurer la délégation sur un cas favorable** (volume de lecture élevé, moins
+> cache-dominé). Scope choisi : le **sous-système LLM** d'`auxitum`, qui se
+> décompose naturellement en plusieurs entités avec dépendances réelles
+> (`agenticOrchestrator.js` 52 Ko, `agenticLoop.js`, `streamProxy.js`, `verifier.js`,
+> `toolCallParser.js`, `confirmation-guard.js`, `routes/llm-proxy.js`).
+
+#### Prérequis S4/S5
+
+- Working tree `auxitum/doc/retro/` **propre** avant de commencer (les manips S1-S3
+  l'ont laissé sale). Restaurer l'état committé puis repartir :
+
+```bash
+echo "=== Go To auxitum ==="
+cd /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum
+
+echo "=== Restore A Clean Committed doc/retro ==="
+git checkout -- doc/retro
+
+echo "=== Remove Any Leftover Test Backups ==="
+rm -rf doc/retro.bak doc/retro.new doc.bak
+
+echo "=== Confirm Clean Working Tree ==="
+git status --short
+```
+
+**Scénario 4 — gros scope full run (délégation + multi-entités) :**
+
+Dans une session Claude Code sur `auxitum` (rédacteur Opus recommandé) :
+
+```
+/retro-doc documente le sous-système LLM : orchestration agentique, proxy streaming, parsing des tool calls, vérification, et la route llm-proxy — full
+```
+
+```bash
+echo "=== Go To auxitum ==="
+cd /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum
+
+echo "=== List Generated Docs (expect several reference-/explanation- files) ==="
+ls doc/retro/
+
+echo "=== Inspect The Cache: Expect Multiple Entities With Non-Empty deps ==="
+cat doc/retro/.retro-doc.yml
+```
+
+**Scénario 5 — incrémental avec propagation 1-niveau (le test clé de l'étape 5) :**
+
+Choisir une source appartenant à une entité **dont d'autres dépendent** (ex.
+`streamProxy.js`, utilisé par l'orchestration agentique et la route proxy).
+
+```bash
+echo "=== Go To auxitum ==="
+cd /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum
+
+echo "=== Append A Revertible Marker On A Depended-Upon Source ==="
+printf '\n// retro-doc propagation test marker\n' >> auxitum-orchestrator/lib/llm/streamProxy.js
+
+echo "=== Commit So HEAD Advances ==="
+git add auxitum-orchestrator/lib/llm/streamProxy.js
+git commit -m "test: retro-doc propagation marker"
+```
+
+Dans la session Claude Code :
+
+```
+/retro-doc documente le sous-système LLM : orchestration agentique, proxy streaming, parsing des tool calls, vérification, et la route llm-proxy
+```
+
+```bash
+echo "=== Go To auxitum ==="
+cd /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum
+
+echo "=== Check Which Docs Were Rewritten (expect the touched entity + its direct dependents only) ==="
+git status --short doc/retro/
+
+echo "=== Inspect Cache source_sha Advanced ==="
+cat doc/retro/.retro-doc.yml
+
+echo "=== Revert The Marker ==="
+git reset --hard HEAD~1
+
+echo "=== Restore doc/retro To Committed State ==="
+git checkout -- doc/retro
+```
+
+**Résultats attendus S4/S5 :**
+- **S4** : `doc/retro/` contient **plusieurs** `reference-*` / `explanation-*` (une paire par entité) ; `.retro-doc.yml` liste **≥ 3-4 entités** dont au moins une avec `deps` **non vide** pointant vers les **ids d'autres entités documentées** (preuve que `dependencies` → `deps` se peuple quand il y a des pairs). Observer si **plusieurs sous-agents Sonnet** sont lancés en parallèle (parallélisme adaptatif, > ~3 entités). Noter coût + contexte d'entrée pour comparer au mono-entité.
+- **S5** : le skill annonce un run **incrémental** ; **seules** les docs de l'entité dont `streamProxy.js` est une source **ET de ses dépendants directs** sont réécrites (`git status` doit montrer ce sous-ensemble précis, pas toutes les entités) ; les entités sans lien restent intactes ; `source_sha` = nouveau HEAD. Après revert + checkout, working tree propre.
+- **Mesure délégation (transverse)** : sur S4 (gros scope), comparer le coût/contexte au mono-entité. Si le gain délégation existe, il doit apparaître ici (lecture fraîche moins cache-dominée). Sinon, l'hypothèse #2 est infirmée même sur gros scope → trancher l'archi.
+
 ### Résultats joués et vérifiés
 
 | Date | Test | Attendu | Observé | Verdict |
@@ -328,6 +421,8 @@ dépendances réelles.
 | 2026-11-03 | S2 rétrocompat v1→v2 | v1 détecté → full forcé → réécrit v2 | `schema_version: 2` + `source_sha` + `entities[]` réécrits — $3.66 / 7m58 | ✅ |
 | 2026-11-03 | S3 incrémental réel | run incrémental ; entité non invalidée si source inchangée | diff `89ac41b..HEAD` → aucune source metering touchée (seul `server.js` marker) → **no-op correct** — $1.27 / 1m23 | ✅ |
 | 2026-11-03 | Délégation (transverse, bloquant) | archéologie déléguée à un sous-agent Sonnet, writer Opus = orchestration/écriture seule | writer **Opus a fait l'archéologie INLINE** (« petit périmètre cohérent → lecture directe, pas de sous-agent ») → économie de tokens défaite | ❌ |
+| 2026-11-03 | Délégation (re-test post-fix) | sous-agent Sonnet lancé même sur petit scope ; writer ne lit pas le code | `Agent(Research metering) Sonnet 4.6` **lancé** ; writer Opus : orchestration + re-lecture ciblée de 5 claims + écriture (a détecté du dead code) — $3.41 / 6m59 | ✅ |
+| 2026-11-03 | Gain de coût réel (full, post-fix) | coût writer full ↓ vs baseline inline | **coût inchangé** ($3.41 vs $3.41/$3.66) malgré délégation effective — hypothèse du gain non démontrée (voir Observation 5) | ❌ |
 
 ### Analyse comparative des runs (2026-11-03)
 
@@ -340,6 +435,7 @@ S1/S2, le **même SHA** (`89ac41b`) — ils sont donc directement comparables.
 | S1 fix hygiene | 8m58 | $3.41 | 3 153 846 → 22 438 (∑ 3 077 012) | 13 | `[]` | ❓ non confirmé |
 | S2 rétrocompat | 7m58 | $3.66 | 3 247 252 → 27 758 (∑ 3 171 850) | 12 | `[]` | ❓ non confirmé |
 | S3 incrémental | **1m23** | **$1.27** | 621 881 → 5 003 (∑ 507 723) | 13 (inchangé) | `[]` | non (no-op) |
+| Re-test S1 (post-fix délég.) | 6m59 | $3.41 | 3 030 599 → 28 644 (∑ 2 858 967) | 14 | `[]` | **oui, Sonnet (confirmé)** |
 
 > 🤔 **Hypothèse** sur le format `X → Y (∑ Z)` : `X` = contexte cumulé en entrée,
 > `Y` = tokens générés, `Z` = part lue depuis le cache (sous-ensemble de `X`).
@@ -365,23 +461,43 @@ lui-même au lieu de déporter sur un sous-agent Sonnet. Le baseline $3,4–3,66
 fois la délégation forcée, le contexte (et le coût) du writer doit chuter
 nettement. À re-mesurer au re-test.
 
-**Observation 4 — couverture non déterministe à SHA constant.** À code identique
-(`89ac41b`), le map varie d'un run à l'autre : **26 → 13 → 12 sources**, et
-**deps `[4]` → `[]` → `[]`**. Le run qui a capturé le plus (S1 hang) est aussi le
-seul où un sous-agent a réellement tourné avant d'être coupé. Deux lectures
-possibles, non tranchées :
-- soit la délégation effective (S1 hang) produit un map plus riche que la lecture
-  inline (S1 fix / S2) → argument de plus pour forcer la délégation ;
-- soit variance intrinsèque de l'archéologie (LLM non déterministe).
+**Observation 4 — couverture non déterministe à SHA constant, et `deps: []` est
+en fait correct ici.** À code identique (`89ac41b`), le nombre de sources varie
+(**26 → 13 → 12 → 14**) : variance intrinsèque de l'archéologie LLM, acceptable
+tant que les claims restent exacts. En revanche, le `deps: [db, streamProxy,
+config, auth]` du run S1-hang était **erroné** : `deps` doit contenir des **ids
+d'entités documentées**, pas des noms de modules bruts. Le scope de test ne
+documente qu'**une** entité (`metering`) → `deps: []` est le **résultat correct**
+(il n'y a aucune autre entité documentée dont dépendre). Le run hang a donc
+sur-peuplé `deps` à tort ; le comportement post-fix est le bon.
 
-Conséquence concrète : avec `deps: []`, la **propagation 1-niveau de l'étape 5 ne
-se déclenchera jamais** — l'invalidation se limiterait aux entités dont une source
-change directement. À re-vérifier après le fix délégation (Observation à tracer
-dans le bloc Diagnostic).
+> **Conséquence test-coverage** : la **propagation 1-niveau de l'étape 5 n'est
+> pas exerçable** sur un scope mono-entité — il faut un scope **multi-entités**
+> pour la tester. Lacune de couverture à combler (voir Diagnostic), pas un bug.
 
-**Synthèse** : feature incrémental ✅ (S3 probant), search-hygiene ✅, mais le vrai
-gain de tokens sur les full runs est **masqué par la régression délégation**. Tant
-qu'elle n'est pas corrigée + re-mesurée, le baseline de coût full n'est pas fiable.
+**Observation 5 — la délégation marche mais le coût ne baisse pas (challenge de
+l'hypothèse #2).** Re-test post-fix : un sous-agent Sonnet est bien lancé et le
+writer Opus ne lit plus le code — pourtant le coût est **identique** ($3.41,
+3,03 M de contexte) aux runs pré-fix. Lecture honnête :
+
+- **94 % du contexte est du cache-read** (∑ 2,86 M / 3,03 M). Les lectures de code
+  sont donc majoritairement facturées au tarif cache (~10 % du prix input) : le
+  **tier du lecteur (Opus vs Sonnet) pèse peu sur le coût** quand la lecture est
+  cache-dominée. Déplacer la lecture sur Sonnet ne change presque rien au total.
+- ❓ **À confirmer de ton côté** : la ligne `Total Cost` / `Usage` de Claude Code
+  **inclut-elle les tokens du sous-agent**, ou est-elle main-session seule ? Si
+  main-seule, alors Opus consomme encore 3 M de contexte malgré la délégation
+  (contre-intuitif → à investiguer). Si agrégée, le wash s'explique par le point
+  cache ci-dessus. Je ne peux pas trancher sans accès au `usage` brut (hors scope
+  du plan, cf. « Hors scope : Mesure runtime du gain token »).
+
+**Synthèse** : les trois mécanismes **fonctionnent** (incrémental ✅ S3,
+search-hygiene ✅, délégation ✅ re-test). Le **gain de coût sur les full runs
+n'est toutefois pas démontré** — soit parce qu'il est réel mais invisible
+(facturation cache-dominée / attribution sous-agent inconnue), soit parce que
+l'architecture déplace le travail sans réduire le coût facturé dans ce modèle de
+billing. Le vrai gain mesurable et incontestable est **l'incrémental** (S3 : −63 %
+sur un module inchangé), pas la délégation.
 
 ## Diagnostic en cours
 
@@ -405,9 +521,15 @@ restreint à l'indisponibilité avérée du tool ; item 1 clarifié (carto ≠
 archéologie) ; nouvelle Hard rule. Fichiers : `SKILL.md` Step 4 (items 1-3 +
 Hard rules), `references/delegation.md` (items 2, 4).
 
-**Pistes ouvertes à vérifier au re-test** :
-- `deps: []` sur S1-post-fix et S2 alors que le run pré-fix avait `deps: [db, streamProxy, config, auth]`. À confirmer : la délégation forcée re-peuple-t-elle `deps` (sinon la propagation 1-niveau de l'étape 5 ne se déclenchera jamais) ? Non tranché faute d'accès à la sortie brute du chercheur.
-- Coût writer Opus résiduel attendu **bas** une fois la lecture 100 % déléguée (orchestration + écriture + re-lecture ciblée des `confidence: low` seulement).
+**✅ RÉSOLU (re-test 2026-11-03, run `f8058b23`)** : sous-agent Sonnet
+(`Agent(Research metering module) Sonnet 4.6`) bien lancé sur le petit scope ;
+writer Opus n'a pas lu le code (orchestration + re-lecture ciblée + écriture). La
+régression bloquante est levée. Verdict délégation : ✅.
+
+**Pistes restées ouvertes (ne bloquent pas la délégation, mais à trancher avant clôture)** :
+- **Gain de coût non démontré** : le coût full est resté identique malgré la délégation (voir `### Analyse comparative § Observation 5`). Cause probable : facturation cache-dominée (94 % cache-read) rendant le tier du lecteur quasi neutre. ❓ À confirmer : la ligne `Total Cost` de Claude Code inclut-elle le sous-agent ?
+- **`deps: []` est correct** sur scope mono-entité (deps = ids d'entités documentées ; une seule entité ⇒ vide). Le `deps` peuplé du run hang était erroné (noms de modules). → voir Observation 4.
+- **Étape 5 (propagation 1-niveau) non testée** : le scope mono-entité `metering` ne peut pas l'exercer. Lacune de couverture — nécessite un **scope multi-entités**.
 
 ## Journal de session
 
@@ -434,3 +556,6 @@ Hard rules), `references/delegation.md` (items 2, 4).
 - 🧪 Tests joués (voir tableau `## Tests`) : S2 ✅, S3 ✅ (incrémental no-op correct, $1.27), S1 ⚠️ (fonctionnel mais `deps: []`), **Délégation ❌ bloquant**.
 - 🐛 Régression critique (remontée par l'utilisateur au test délégation) : writer Opus fait l'archéologie **inline** sur scope « petit » au lieu de déléguer → objectif #2 défait. Cause : wording non impératif (3 portes de sortie). Correctif : délégation rendue **obligatoire quelle que soit la taille** (`SKILL.md` Step 4 items 1-3 + nouvelle Hard rule ; `references/delegation.md` items 2, 4). Détail et pistes ouvertes dans `## Diagnostic en cours`.
 - 📋 Prochain : **re-test délégation** (vérifier qu'un sous-agent Sonnet est bien lancé sur petit scope + que `deps` se re-peuple), puis reprise de 🧪 Tests → ✅ Validation.
+- ✅ Re-test délégation OK (run `f8058b23`) : sous-agent Sonnet lancé sur petit scope, writer Opus ne lit plus le code, garde-fou étape 6 a détecté du dead code. Régression bloquante **levée**.
+- ⚠️ Finding stratégique (Observation 5) : coût full **inchangé** ($3.41) malgré délégation effective → facturation cache-dominée (94 %) neutralise le tier du lecteur. Le gain mesurable réel = **l'incrémental** (S3, −63 %), pas la délégation. Le scope de test (3 fichiers) est trop petit pour que la délégation paie. 2 points ouverts avant clôture : mesure délégation sur gros scope + test étape 5 (propagation, nécessite multi-entités).
+- 📋 Prochain : décision utilisateur — test multi-entités/gros scope, ou clôture avec caveats.
