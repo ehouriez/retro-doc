@@ -329,6 +329,60 @@ dépendances réelles.
 | 2026-11-03 | S3 incrémental réel | run incrémental ; entité non invalidée si source inchangée | diff `89ac41b..HEAD` → aucune source metering touchée (seul `server.js` marker) → **no-op correct** — $1.27 / 1m23 | ✅ |
 | 2026-11-03 | Délégation (transverse, bloquant) | archéologie déléguée à un sous-agent Sonnet, writer Opus = orchestration/écriture seule | writer **Opus a fait l'archéologie INLINE** (« petit périmètre cohérent → lecture directe, pas de sous-agent ») → économie de tokens défaite | ❌ |
 
+### Analyse comparative des runs (2026-11-03)
+
+Tous les runs portent sur le **même scope** (module metering d'`auxitum`) et, pour
+S1/S2, le **même SHA** (`89ac41b`) — ils sont donc directement comparables.
+
+| Run | Durée | Coût | Contexte in → out (∑ cache) | Sources | deps | Sous-agent ? |
+|---|---|---|---|---|---|---|
+| S1 hang (pré-fix) | 12m55 | **$5.73** | 5 808 119 → 41 294 (∑ 5 562 870) | 26 | `[db, streamProxy, config, auth]` | oui (a hang) |
+| S1 fix hygiene | 8m58 | $3.41 | 3 153 846 → 22 438 (∑ 3 077 012) | 13 | `[]` | ❓ non confirmé |
+| S2 rétrocompat | 7m58 | $3.66 | 3 247 252 → 27 758 (∑ 3 171 850) | 12 | `[]` | ❓ non confirmé |
+| S3 incrémental | **1m23** | **$1.27** | 621 881 → 5 003 (∑ 507 723) | 13 (inchangé) | `[]` | non (no-op) |
+
+> 🤔 **Hypothèse** sur le format `X → Y (∑ Z)` : `X` = contexte cumulé en entrée,
+> `Y` = tokens générés, `Z` = part lue depuis le cache (sous-ensemble de `X`).
+> Sémantique exacte non vérifiée (pas d'accès au champ `usage` brut), mais `Z < X`
+> exclut que `Z` soit le total.
+
+**Observation 1 — le hang a coûté ~$2,3 et ~4 min pour rien.** Le `grep -rn` sans
+exclusion a renvoyé un volume massif réinjecté dans le contexte : l'entrée bondit
+à **5,8 M** vs **3,15 M** après fix (**+84 %**). Le correctif « search hygiene »
+est validé par les chiffres : −45 % de contexte, −$2,32, −4 min.
+
+**Observation 2 — le gain incrémental est réel et important (S3).** Sur un module
+inchangé, le run incrémental coûte **$1,27 vs ~$3,4–3,66** pour un full
+(**−63 %**) et **1m23 vs ~8 min** (**−83 %**). Le contexte d'entrée tombe à
+**0,62 M** (−80 %) : le run lit seulement le diff, le cache et l'existence des docs,
+sans archéologie. C'est la preuve que les étapes 4-5 remplissent leur objectif.
+
+**Observation 3 — mais le coût d'un full reste anormalement haut (~$3,5 pour 3
+fichiers).** Un contexte d'entrée de ~3,2 M sur un module de ~660 lignes est le
+**symptôme direct de la régression délégation** : le writer Opus lit tout le code
+lui-même au lieu de déporter sur un sous-agent Sonnet. Le baseline $3,4–3,66
+**n'est donc pas la cible optimisée** — il est gonflé par la lecture inline. Une
+fois la délégation forcée, le contexte (et le coût) du writer doit chuter
+nettement. À re-mesurer au re-test.
+
+**Observation 4 — couverture non déterministe à SHA constant.** À code identique
+(`89ac41b`), le map varie d'un run à l'autre : **26 → 13 → 12 sources**, et
+**deps `[4]` → `[]` → `[]`**. Le run qui a capturé le plus (S1 hang) est aussi le
+seul où un sous-agent a réellement tourné avant d'être coupé. Deux lectures
+possibles, non tranchées :
+- soit la délégation effective (S1 hang) produit un map plus riche que la lecture
+  inline (S1 fix / S2) → argument de plus pour forcer la délégation ;
+- soit variance intrinsèque de l'archéologie (LLM non déterministe).
+
+Conséquence concrète : avec `deps: []`, la **propagation 1-niveau de l'étape 5 ne
+se déclenchera jamais** — l'invalidation se limiterait aux entités dont une source
+change directement. À re-vérifier après le fix délégation (Observation à tracer
+dans le bloc Diagnostic).
+
+**Synthèse** : feature incrémental ✅ (S3 probant), search-hygiene ✅, mais le vrai
+gain de tokens sur les full runs est **masqué par la régression délégation**. Tant
+qu'elle n'est pas corrigée + re-mesurée, le baseline de coût full n'est pas fiable.
+
 ## Diagnostic en cours
 
 ### Bloc — Délégation non forcée (régression critique, remontée aux tests 🧪)
