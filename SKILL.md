@@ -265,9 +265,67 @@ After writing the docs:
    grep -rhoE "\]\(([^)]+\.md)\)" <base>/retro/ | sort -u
    ```
 
+> **Incremental runs:** regenerate only the INDEX entries for invalidated entities;
+> leave all other entries intact.
+
 ---
 
-## Step 8 — Quality self-review
+## Step 8 — Cache persistence (write `.retro-doc.yml` v2)
+
+After writing all documentation and the INDEX, persist the run results so future
+incremental runs can reuse the concept map and skip unchanged entities.
+
+1. **Resolve HEAD SHA** (skip silently if not a git repo):
+
+   ```bash
+   git rev-parse HEAD 2>/dev/null || true
+   ```
+
+2. **Build the `entities[]` array** from the concept map assembled in Step 3 and
+   the partition and files written in Steps 4–7. For each entity:
+
+   - `id` — kebab-case entity id from the concept map.
+   - `quadrants` — the quadrants produced (from Step 4 partition).
+   - `docs` — map of quadrant → filename written under `<base>/retro/`.
+   - `sources` — `file:line` provenance anchors from the concept map's claims.
+   - `deps` — entity ids from the concept map's `dependencies` field.
+   - `confidence` — aggregate: `high` if all claims are `high`, `low` if any is `low`.
+
+3. **Write `.retro-doc.yml` v2** — merge, never clobber `language:` or other
+   pre-existing keys:
+
+   ```yaml
+   language: <resolved in Step 1>
+   schema_version: 2
+   source_sha: <HEAD SHA, or omit if not a git repo>
+   entities:
+     - id: <entity-id>
+       quadrants: [reference, explanation]
+       docs:
+         reference: reference-<slug>.md
+         explanation: explanation-<slug>.md
+       sources:
+         - <file>:<line>
+       deps: [<dep-entity-id>]
+       confidence: high | low
+   ```
+
+   Full field reference: `references/cache-schema.md`.
+
+   **On a full run:** write all entities in scope.
+   **On an incremental run:** rewrite only the invalidated entities' entries; copy
+   the non-invalidated entries unchanged from the previous cache.
+
+4. **Coherence with Step 7 (INDEX):** the entities written here must match exactly
+   the entities whose doc files are present under `<base>/retro/`.
+
+5. **Coherence with Step 10 (secret scan):** pass the set of files just written
+   (from `docs` entries) to the scan. On a full run this is equivalent to all
+   files under `<base>/retro/`; on an incremental run only the regenerated subset.
+
+---
+
+## Step 9 — Quality self-review
 
 Before reporting done, review each document:
 
@@ -290,7 +348,12 @@ Fix any failure before reporting.
 
 ---
 
-## Step 9 — Secret scan, then STOP (no commit, no push)
+## Step 10 — Secret scan, then STOP (no commit, no push)
+
+> **Scan scope.** Target only the files written or rewritten during this run —
+> the filenames from the `docs` entries of Step 8's entities, plus
+> `.retro-doc.yml` itself. On a full run this equals all files under
+> `<base>/retro/`; on an incremental run it covers only the regenerated subset.
 
 1. **Scan the generated files for live-format secrets** before handing back.
    This replaces a binary redaction tool with a dependency-free grep. Flag, do
