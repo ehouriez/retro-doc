@@ -19,6 +19,8 @@ allowed-tools:
   - Grep
   - Glob
   - AskUserQuestion
+  - Agent
+  - Task
 ---
 
 # retro-doc — Diataxis Retro-Documentation Generator
@@ -99,6 +101,10 @@ The output language is **per project** and **persisted** so it is asked at most 
    language: fr
    ```
 
+   This file is also the incremental-regeneration cache from v2 on
+   (`schema_version`, `source_sha`, `entities[]`). The full format is in
+   `references/cache-schema.md`; never clobber keys you do not own.
+
 6. **Override**: if the user names a language in their request ("documente en
    anglais"), that wins for this run and is written back to the config.
 
@@ -128,40 +134,57 @@ hand-written documentation.
 
 ---
 
-## Step 3 — Codebase archaeology (research phase)
+## Step 3 — Codebase archaeology (delegated research phase)
 
-The quality of the documentation depends on how well you understand the code, so
-this step carries the most weight.
+The quality of the documentation depends on how well the code is understood, so
+this step carries the most weight. Reading the whole source surface is also the
+dominant token cost of a run — so the **heavy reading is delegated** to a fresh
+`general-purpose` sub-agent (the **researcher**) on a cheaper `standard` model,
+which returns a provenance-tagged **concept map**. The calling model (the
+**writer**) keeps the judgement work (partition, Explanation prose, arbitration
+of doubtful claims, final writing). See `references/delegation.md` for the two
+roles, the tier → model mapping, and the full output contract.
 
-1. **Map the project structure:**
+> **Writer model recommendation (non-blocking).** The heavy reading is off the
+> writer, so keeping the writer on a `reasoning` model costs only on output —
+> where judgement pays. Recommend it once; never block. The skill stays
+> functional if the writer is `standard`.
+
+1. **Light cartography (inline — `glob`/`grep`, cheap).** Estimate the entities
+   in scope and the project shape:
 
    ```bash
    find . -type f -not -path "./.git/*" -not -path "./node_modules/*" -not -path "./dist/*" -not -path "./build/*" -not -path "./.next/*" -not -path "./vendor/*" | head -200
    ```
 
-2. **Read the entry points:**
-   - `README*`, `ARCHITECTURE*`, `CONTRIBUTING*`, `CLAUDE.md` / `AGENTS.md`.
-   - Project manifest: `package.json` / `pyproject.toml` / `Cargo.toml` / `go.mod`
-     / `pom.xml` / `composer.json` (understand the project type and entry points).
-   - Main entry files, configuration files and examples.
+   Read the entry points inline: `README*`, `ARCHITECTURE*`, `CONTRIBUTING*`,
+   `CLAUDE.md` / `AGENTS.md`, and the project manifest (`package.json` /
+   `pyproject.toml` / `Cargo.toml` / `go.mod` / `pom.xml` / `composer.json`).
 
-3. **Read the source for each target entity** (not just signatures):
-   - Implementation files end to end.
-   - Tests — they reveal intended behavior, edge cases, and real usage.
-   - Related modules the target depends on or is depended upon by.
-   - Existing inline comments, especially `NOTE:`, `DESIGN:`, `WHY:`.
+2. **Delegate the deep research.** Launch the researcher(s) via the `Agent`
+   tool (`subagent_type: "general-purpose"`, `model: "sonnet"` — the `standard`
+   tier). **Adaptive parallelism:** ≤ ~3 entities → one sub-agent for the whole
+   scope; more → one sub-agent per coherent group of entities, launched in
+   parallel. Each researcher reads the source end to end — implementation, tests
+   (intended behavior, edge cases, real usage), dependencies, and inline
+   `NOTE:`/`DESIGN:`/`WHY:` comments — and returns the **concept-map output
+   contract** (`references/delegation.md`): for each entity, `purpose`,
+   `key_concepts`, `public_surface`, `dependencies`/`dependents`, `edge_cases`,
+   `design_decisions`, `suggested_quadrants`. **Every non-trivial claim carries a
+   `file:line` `source` and a `confidence`.** **Never use `fork`** — it inherits
+   the parent context (ruining the token economy) and ignores the `model`
+   override.
 
-4. **Build a concept map** (internal, not written to disk) for each target:
+3. **Fallback — inline archaeology.** If the `Agent` tool or the target model is
+   unavailable, the writer does the research itself (identical to the v1 Step 3:
+   read implementation end to end, tests, dependencies, inline comments; build
+   the same concept map). Delegation is an optimisation, not a dependency — the
+   skill stays prompt-only. The rest of the pipeline is identical either way.
 
-   ```
-   Target: <name>
-   Purpose: <one sentence — what problem it solves>
-   Key concepts: <3-5 concepts a reader must understand>
-   Public surface: <commands, functions, config options, API endpoints>
-   Dependencies: <what it needs> / Dependents: <what relies on it>
-   Edge cases: <from tests and code>
-   Design decisions: <non-obvious "why" choices, with file:line evidence>
-   ```
+4. **Consolidate the map.** The returned concept map (or the inline one) is the
+   single input to partition and writing. Each claim's `source`, the
+   `dependencies`, and the confidence feed the persisted cache
+   (`references/cache-schema.md`).
 
 5. State what you found: "Researched N files, K public-surface items, M concepts,
    J design decisions." Then proceed to partition.

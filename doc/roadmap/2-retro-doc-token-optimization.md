@@ -54,8 +54,8 @@ reste 100 % prompt-only.
 
 ## Étapes
 
-- [ ] Étape 1 — Schéma `.retro-doc.yml` étendu (`language`, `source_sha`, `entities[]{sources[file:line], deps[], confidence, quadrants}`) + extension `allowed-tools` (`Agent`/`Task`) + doc du format cache dans `references/` (M · reasoning → Opus)
-- [ ] Étape 2 — Step 3 refondu : délégation à un sous-agent `general-purpose` configurable (`Agent` frais avec override `model` vers le tier `standard`, **jamais un `fork`** qui hériterait du contexte et ignorerait l'override), cartographie légère intégrée, parallélisme adaptatif au scope, contrat de sortie = concept map à provenance, fallback inline si `Agent` indisponible. Documenter les **deux rôles** (rédacteur / chercheur) et émettre une **recommandation non bloquante** : rédacteur en tier `reasoning` (L · reasoning → Opus)
+- [x] Étape 1 — Schéma `.retro-doc.yml` étendu (`language`, `source_sha`, `entities[]{sources[file:line], deps[], confidence, quadrants}`) + extension `allowed-tools` (`Agent`/`Task`) + doc du format cache dans `references/` (M · reasoning → Opus)
+- [x] Étape 2 — Step 3 refondu : délégation à un sous-agent `general-purpose` configurable (`Agent` frais avec override `model` vers le tier `standard`, **jamais un `fork`** qui hériterait du contexte et ignorerait l'override), cartographie légère intégrée, parallélisme adaptatif au scope, contrat de sortie = concept map à provenance, fallback inline si `Agent` indisponible. Documenter les **deux rôles** (rédacteur / chercheur) et émettre une **recommandation non bloquante** : rédacteur en tier `reasoning` (L · reasoning → Opus)
 - [ ] Étape 3 — Persistance du cache enrichi en fin de run (map + SHA courant) dans `.retro-doc.yml`, cohérence avec Step 7 (INDEX) et Step 9 (stop) (S · standard → Sonnet)
 - [ ] Étape 4 — Régénération incrémentale : lecture cache + SHA, `git diff <sha>..HEAD`, défaut incrémental si cache présent, mots-clés `full`/`incrémental`, rétrocompat = full forcé si cache v1 (M · reasoning → Opus)
 - [ ] Étape 5 — Invalidation par entité + propagation aux dépendants directs (1 niveau) depuis le graphe `deps` du map (M · reasoning → Opus)
@@ -322,3 +322,8 @@ git reset --hard HEAD~1
 - ✅ Fait : section « Contexte d'implémentation (auto-portant) » ajoutée (état de départ, invariants, schéma `.retro-doc.yml` v2, contrat du concept map, protocole de délégation, algo de régénération, mapping steps, reprise) — le plan est désormais implémentable par un agent frais post-`/clear`.
 - ✅ Fait : procédure de tests écrite (section `## Tests`) — 3 scénarios sur auxitum (neuf / rétrocompat / incrémental réel avec commit du marqueur + revert). Décision « base de diff incrémental » signalée à confirmer à l'étape 4.
 - 📋 Prochain : implémentation (Lot 1 → Lot 4), puis exécution des tests 3 scénarios sur auxitum.
+
+### Session 2026-11-03 (implémentation étapes 1-2)
+- ✅ Étape 1 : `allowed-tools` étendu (`Agent`/`Task`) dans `SKILL.md` ; schéma cache v2 documenté dans `references/cache-schema.md` (`schema_version`, `source_sha`, `entities[]{quadrants, docs, sources[file:line], deps, confidence}`, rétrocompat v1→full) ; pointeur ajouté au Step 1.
+- ✅ Étape 2 : Step 3 de `SKILL.md` refondu (archéologie → délégation) — carto légère inline, parallélisme adaptatif, `Agent general-purpose` + `model: sonnet` (jamais `fork`), fallback inline, reco non bloquante rédacteur `reasoning` ; contrat concept map + 2 rôles + mapping tier→modèle dans `references/delegation.md`.
+- 📋 Prochain : étapes 3→6 (persistance cache, régén incrémentale, invalidation, garde-fou qualité), puis 🧪 Tests + ✅ Validation sur auxitum.
