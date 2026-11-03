@@ -466,12 +466,26 @@ ls doc/retro/ | grep -cE '^(reference|explanation)-'
 grep -c '^  - id:' doc/retro/.retro-doc.yml
 ```
 
+**Mesure de référence = Langfuse (pas la ligne Claude Code).** Les appels des
+sous-agents Sonnet sont tracés dans Langfuse, rattachés à la **Session ID** du run
+(vérifié : trace `litellm-anthropic_messages`, `api_base` …`claude-sonnet-4-6`…,
+session S5 `14d62f94…`). Méthode :
+
+1. **Total honnête du run** = somme des coûts de **toutes les traces filtrées par
+   la Session ID** du run (Opus writer + Sonnet chercheurs).
+2. **Split par modèle** (l'`api_base` distingue `claude-opus-*` de
+   `claude-sonnet-4-6`) : relever la **part Opus** (writer) et la **part Sonnet**
+   (chercheurs) séparément. C'est la mesure qui tranche l'architecture : la lecture
+   lourde doit être majoritairement en Sonnet, et la part Opus doit être une
+   fraction d'un run v1 tout-Opus.
+3. **Contrôle du confond ligne CC** : comparer le total Langfuse-session à la ligne
+   `Total Cost` de Claude Code du même run. Si Langfuse > ligne CC → la ligne CC est
+   main-only et sous-estime v2.
+
 **Résultats attendus / à relever S6 :**
-- Coût + durée du run v2, à mettre en regard du **$22.48 v1**.
-- **⚠️ Confond à lever** : la ligne `Total Cost` de Claude Code inclut-elle les
-  tokens des sous-agents Sonnet ? Si non, le total réel = ligne session + coût des
-  chercheurs (à lire côté facturation API). v1 n'avait pas de sous-agent → son
-  $22.48 est tout-compris ; la comparaison n'est honnête qu'à périmètre de coût égal.
+- **Total Langfuse-session v2** vs **$22.48 v1** (v1 sans sous-agent → son total
+  Langfuse ≈ $22.48 ; même méthode des deux côtés).
+- **Split Opus / Sonnet** du run v2 (preuve réelle du report de la lecture lourde).
 - Nombre d'entités/docs produits en v2 vs v1 (volume comparable ?).
 - État du code identique au run v1 ? (auxitum a évolué → biais possible à noter).
 - `deps` peuplé sur plusieurs entités (confirmation à grande échelle).
