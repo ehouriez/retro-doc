@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: Emmanuel Houriez
-  version: "2.0.0"
+  version: "2.0.1"
 allowed-tools:
   - Bash
   - Read
@@ -251,16 +251,21 @@ roles, the tier → model mapping, and the full output contract.
    contract** (`references/delegation.md`): for each entity, `purpose`,
    `key_concepts`, `public_surface`, `dependencies`/`dependents`, `edge_cases`,
    `design_decisions`, `suggested_quadrants`. **Every non-trivial claim carries a
-   `file:line` `source` and a `confidence`.** **Never use `fork`** — it inherits
-   the parent context (ruining the token economy) and ignores the `model`
-   override.
+   `file:line` `source` and a `confidence`.** **Instruct the researcher that every
+   recursive search must exclude vendored/build trees** —
+   `grep -rn --exclude-dir={node_modules,dist,build,.next,vendor,.git} …` or `rg`
+   (same exclusion set as the cartography `find` above): without it a `grep -rn`
+   over a project with dependencies installed scans tens of thousands of files and
+   hangs. **Never use `fork`** — it inherits the parent context (ruining the token
+   economy) and ignores the `model` override.
 
 3. **Fallback — inline archaeology.** If the `Agent` tool or the target model is
    unavailable, the writer does the research itself (identical to the v1 Step 3:
    read implementation end to end, tests, dependencies, inline comments; build
-   the same concept map, with the same `source`/`confidence` on every claim).
-   Delegation is an optimisation, not a dependency — the skill stays prompt-only.
-   The rest of the pipeline is identical either way.
+   the same concept map, with the same `source`/`confidence` on every claim). The
+   same search hygiene applies — exclude `node_modules,dist,build,.next,vendor,.git`
+   from recursive greps. Delegation is an optimisation, not a dependency — the
+   skill stays prompt-only. The rest of the pipeline is identical either way.
 
 4. **Consolidate the map.** The returned concept map (or the inline one) is the
    single input to partition and writing. Each claim's `source`, the

@@ -246,6 +246,7 @@ mv doc/retro doc/retro.bak
 Puis, dans une session Claude Code sur `auxitum` :
 
 ```
+# session: 35110636-cbc5-452e-9998-a4c25c1d6bad
 /retro-doc documente le module de metering
 ```
 
@@ -259,7 +260,7 @@ cat doc/retro/.retro-doc.yml
 
 ```bash
 echo "=== Keep The Fresh v2 Output Aside ==="
-mv doc/retro doc/retro.new
+mv doc/retro doc/retro.new.metering
 
 echo "=== Restore The v1 Output As Current ==="
 mv doc/retro.bak doc/retro
@@ -335,4 +336,5 @@ git reset --hard HEAD~1
 - ✅ Étape 6 : garde-fou qualité = item 5 du Step 4 (archéologie) — re-lecture ciblée par le **rédacteur lui-même** des claims `confidence: low` via `Read`/`Grep` sur leurs `file:line` (lignes citées seulement), interne/silencieux, aucune interaction ; ajout d'une checkbox dédiée à la gate Accuracy (Step 10).
 - 🔧 Renumérotation : insertion du Step 3 a décalé l'archéologie → Step 4, puis 4→5…10→11 ; toutes les cross-refs internes et le résumé final (`Mode: full | incremental`) mis à jour ; version metadata bumpée `1.0.0` → `2.0.0`.
 - 🔒 Décision étape 4 tranchée : base de diff = `source_sha..HEAD` (commité seul) ; limite documentée dans le Step 3 (editions working-tree non détectées → commiter ou `full`). Conforme au scénario de test 3 qui commite le marqueur.
+- 🐛 Correctif (remonté par le 1er test réel) : le chercheur Sonnet a hang sur des `grep -rn …/auxitum-orchestrator/` sans exclusion → 31088 fichiers scannés (×65) sur mount `/mnt/c`, 2 tasks `stopped`, `dependents[]` incomplet. Le `find` de carto excluait déjà les vendored dirs mais l'exclusion n'était **pas transmise au chercheur**. Ajout d'une consigne « search hygiene » (`--exclude-dir={node_modules,dist,build,.next,vendor,.git}` ou `rg`) dans le prompt de délégation : `SKILL.md` Step 4 item 2, fallback item 3, et `references/delegation.md` protocole item 3.
 - 📋 Prochain : 🧪 Tests (3 scénarios sur auxitum) puis ✅ Validation.

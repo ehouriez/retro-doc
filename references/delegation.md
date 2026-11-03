@@ -46,6 +46,13 @@ precisely where judgement pays. State the recommendation once, do not block.
      implementation end to end, tests, dependencies, inline `NOTE:`/`DESIGN:`/`WHY:`
      comments) **plus the output contract below** — every non-trivial claim must
      carry a `file:line` `source` and a `confidence`.
+   - **Search hygiene (mandatory in the prompt).** Instruct the researcher that
+     every recursive search **must exclude vendored/build trees**, otherwise a
+     `grep -rn` over a project with dependencies installed scans tens of thousands
+     of files (often on a slow mount) and hangs. Require
+     `grep -rn --exclude-dir={node_modules,dist,build,.next,vendor,.git} …` (or
+     `rg`, which honours `.gitignore` by default). Same exclusion set as the
+     cartography `find` in `SKILL.md` Step 4.
    - **Never use `fork`.** A fork inherits the parent context (which ruins the
      token economy) and ignores the `model` override.
 4. **Fallback.** If the `Agent` tool or the target model is unavailable, the
