@@ -87,6 +87,118 @@ de modèle (action IDE) — il **recommande** `reasoning` pour le rédacteur san
 bloquer, et reste fonctionnel si le rédacteur est `standard` (qualité moindre
 sur l'arbitrage des claims douteux).
 
+## Contexte d'implémentation (auto-portant)
+
+> Tout ce qu'un agent frais (post-`/clear`) doit savoir pour implémenter sans le
+> contexte de la session de cadrage. **Lire `SKILL.md` + `references/` avant toute
+> édition** (leurs numéros de ligne bougeront — se repérer par titres de section).
+
+### État de départ du skill (v1.0.0)
+
+| Fichier | Rôle actuel |
+|---|---|
+| `SKILL.md` (~320 l.) | Moteur prompt-only en 10 steps (0→9). `allowed-tools`: Bash, Read, Write, Edit, Grep, Glob, AskUserQuestion |
+| `references/diataxis.md` | Matrice de partition Diataxis (quel quadrant par type d'entité) |
+| `references/templates.md` | Templates Reference / Explanation / INDEX / How-to / Tutorial |
+
+Steps actuels de `SKILL.md` : **0** Scope & intent · **1** Output language
+(detect/persist `.retro-doc.yml`) · **2** Output location (`<base>/retro/`) ·
+**3** Codebase archaeology (concept map interne) · **4** Diataxis partition ·
+**5** Reference · **6** Explanation · **7** INDEX & README link · **8** Quality
+self-review · **9** Secret scan + STOP.
+
+### Invariants — à NE PAS casser
+
+- **Prompt-only** : aucun script runtime, aucune dépendance externe. Le tool `Agent` est un outil de l'agent, pas une dépendance → acceptable.
+- Sortie **isolée** sous `<base>/retro/` ; un seul lien ajouté au README ; **jamais de commit/push**.
+- Détection de langue + `.retro-doc.yml` existant (clé `language`) : **rétrocompat totale**.
+- Scan secrets (Step 9) conservé ; exactitude `file:line` (déjà validée v1) préservée.
+
+### Schéma cible `.retro-doc.yml` (v2)
+
+```yaml
+# <base>/retro/.retro-doc.yml
+language: fr                 # v1 — inchangé
+schema_version: 2            # absent ou 1 = cache v1 (language seul) → full forcé
+source_sha: a1b2c3d          # SHA du dernier run réussi (full ou incrémental)
+entities:
+  - id: metering-service
+    quadrants: [reference, explanation]
+    docs:
+      reference: reference-metering-service.md
+      explanation: explanation-metering-service.md
+    sources:                 # fichiers/ancres qui alimentent cette entité
+      - server.js:127
+      - metering/usage.js:1-88
+    deps: [auth-middleware]  # entités dont celle-ci dépend (invalidation 1 niveau)
+    confidence: high
+```
+
+### Contrat du concept map (sortie du sous-agent chercheur)
+
+Pour **chaque entité en scope**, le sous-agent retourne (en plus de la prose, un
+objet structuré parsable) :
+
+```
+id · purpose (1 phrase)
+key_concepts[]
+public_surface[]     chaque item : { text, source "file:line", confidence: high|low }
+dependencies[] / dependents[]   → alimentent `deps`
+edge_cases[]         { text, source }
+design_decisions[]   { text, source, confidence }
+suggested_quadrants  (reference / explanation, selon references/diataxis.md)
+```
+
+Règle : **tout claim non trivial porte `source` (`file:line`) et `confidence`**.
+Les claims `confidence: low` sont ceux que le rédacteur re-lira (étape 6).
+
+### Protocole de délégation (étape 2)
+
+1. Après résolution base + langue, cartographie légère (`glob`/`grep`) pour estimer les entités en scope.
+2. **Parallélisme adaptatif** : ≤ ~3 entités → 1 sous-agent ; sinon 1 sous-agent par groupe cohérent d'entités.
+3. Lancer `Agent(subagent_type: "general-purpose", model: <tier standard résolu>)` — prompt = instructions d'archéologie + **contrat de sortie ci-dessus** (exiger `file:line` + `confidence`). Jamais `fork`.
+4. **Fallback** : tool `Agent` ou modèle cible indisponible → le rédacteur fait l'archéologie inline (= Step 3 v1). Le reste du pipeline est identique.
+
+### Algorithme de régénération (nouveau step, avant l'archéologie)
+
+```
+Lire <base>/retro/.retro-doc.yml
+SI absent OU schema_version ∈ {absent, 1}      → FULL (puis écrire cache v2)
+SINON SI mot-clé "full" dans le prompt         → FULL
+SINON (défaut si cache v2, ou mot-clé "incrémental") → INCRÉMENTAL
+
+INCRÉMENTAL :
+  changed = git diff --name-only <source_sha>..HEAD
+  SI pas de repo git / SHA introuvable         → FULL + signaler
+  invalides = { e ∈ entities | un fichier de e.sources ∈ changed }
+  invalides += { e | e.deps ∩ invalides ≠ ∅ }   # propagation 1 niveau
+  Re-déléguer la recherche UNIQUEMENT sur `invalides` ; réécrire leurs docs ;
+  conserver les docs des entités non invalidées.
+  Réécrire INDEX (entrées touchées), re-scan secrets (fichiers réécrits).
+
+FIN (full ou incrémental) :
+  source_sha = HEAD courant ; réécrire entities[] ; persister .retro-doc.yml v2.
+```
+
+### Mapping steps `SKILL.md` → modifications
+
+| Step actuel | Modification |
+|---|---|
+| (nouveau) Régénération | Insérer **avant** l'archéologie : décide full/incrémental, calcule `invalides` |
+| 3 Archaeology | Remplacé par **délégation** (protocole ci-dessus) ; map = contrat de sortie du sous-agent |
+| 4 Partition | Inchangé (s'appuie sur `suggested_quadrants`) |
+| 5/6 Reference/Explanation | Inchangés, mais partent du map + **re-lecture ciblée** des claims `confidence: low` (étape 6) |
+| 7 INDEX | En incrémental, ne régénère que les entrées touchées |
+| (nouveau) Persistance cache | Écrire `.retro-doc.yml` v2 (`source_sha`, `entities[]`) |
+| 9 Secret scan | Limité aux fichiers générés/réécrits de ce run |
+| front matter `allowed-tools` | + `Agent` (+ `Task` si exposé par l'IDE) |
+
+### Reprise (agent frais)
+
+- `doc/roadmap/` présent → **roadmap-tracking s'appliquera au démarrage** : reprendre le plan `#2`, suivre les phases jusqu'à l'implémentation.
+- Projet de validation : `auxitum` (clone `/mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum`), déjà documenté par la v1 → sert au scénario rétrocompat.
+- Prompt de reprise : `Reprends le plan 2-retro-doc-token-optimization.md`.
+
 ## Décisions techniques
 
 | Décision | Choix retenu | Justification |
@@ -116,4 +228,5 @@ sur l'arbitrage des claims douteux).
 ### Session 2026-11-03
 - ✅ Fait : cadrage complet (8 décisions d'architecture + 4 décisions de frontier), issue #2 créée, plan créé.
 - ✅ Fait : section « Rôles et modèles » ajoutée (rédacteur appelant `reasoning` recommandé / chercheur sous-agent `standard`), clarification du garde-fou #6 (re-lecture par le rédacteur lui-même, sans gate), décisions `Modèle du rédacteur` et `Mécanisme de délégation` ajoutées.
+- ✅ Fait : section « Contexte d'implémentation (auto-portant) » ajoutée (état de départ, invariants, schéma `.retro-doc.yml` v2, contrat du concept map, protocole de délégation, algo de régénération, mapping steps, reprise) — le plan est désormais implémentable par un agent frais post-`/clear`.
 - 📋 Prochain : implémentation (Lot 1 → Lot 4), puis tests 3 scénarios sur auxitum.
