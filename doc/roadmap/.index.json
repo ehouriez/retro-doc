@@ -10,11 +10,11 @@
   },
   {
     "id": "2",
-    "status": "active",
+    "status": "done",
     "priority": "high",
     "complexity": "L",
     "title": "[⚡] Plan #2 - retro-doc token optimization",
     "deps": [],
-    "path": "2-retro-doc-token-optimization.md"
+    "path": "done/2-retro-doc-token-optimization.md"
   }
 ]

@@ -2,8 +2,8 @@
 plan:
   id: '2'
   name: 2-retro-doc-token-optimization.md
-  link: https://github.com/ehouriez/retro-doc/blob/main/doc/roadmap/2-retro-doc-token-optimization.md
-status: active
+  link: https://github.com/ehouriez/retro-doc/blob/main/doc/roadmap/done/2-retro-doc-token-optimization.md
+status: done
 date: 2026-11-03
 description: >
   Reduce retro-doc token cost by delegating code archaeology to a configurable
@@ -60,8 +60,8 @@ reste 100 % prompt-only.
 - [x] Étape 4 — Régénération incrémentale : lecture cache + SHA, `git diff <sha>..HEAD`, défaut incrémental si cache présent, mots-clés `full`/`incrémental`, rétrocompat = full forcé si cache v1 (M · reasoning → Opus)
 - [x] Étape 5 — Invalidation par entité + propagation aux dépendants directs (1 niveau) depuis le graphe `deps` du map (M · reasoning → Opus)
 - [x] Étape 6 — Garde-fou qualité : marquage `confidence` par claim par le sous-agent, re-lecture ciblée par le **rédacteur lui-même** (le modèle appelant, pas une gate ni un sous-agent) via ses propres `Read`/`Grep` sur les `file:line` des claims `confidence: low`, avant écriture. Interne au run, silencieux, sans interaction utilisateur (S · reasoning → Opus)
-- [ ] 🧪 Tests — Rédiger et exécuter la procédure de validation (3 scénarios : neuf, rétrocompat, incrémental sur diff)
-- [ ] ✅ Validation — Vérifier les résultats et clôturer
+- [x] 🧪 Tests — Procédure exécutée : S1 (neuf), S2 (rétrocompat), S3 (incrémental), S4 (gros scope multi-entités), S5 (propagation étape 5), S6 (comparatif pleine rétro-doc v1↔v2) — voir `## Tests`
+- [x] ✅ Validation — Résultats vérifiés : mécaniques OK (délégation, incrémental, propagation, garde-fou), comparatif v1↔v2 prouve le gain qualité/largeur à coût/doc −57 %
 
 ## Rôles et modèles
 
@@ -504,6 +504,8 @@ session S5 `14d62f94…`). Méthode :
 | 2026-11-03 | S4 gros scope full | ≥ 3-4 entités, `deps` peuplé, délégation parallèle | **6 entités** ; `deps` peuplé entre entités (`agentic-orchestration`→[tool-call-parsing, verification, llm-support], `llm-proxy-route`→[stream-proxy, agentic-orchestration, verification, llm-support], `verification`→[agentic-orchestration, llm-support]) ; **4 chercheurs Sonnet parallèles** lancés — $10.51 / 17m32 | ✅ |
 | 2026-11-03 | S5 propagation (étape 5, test clé) | entité touchée + dépendants directs invalidés, autres intacts | marker sur `streamProxy.js` → **stream-proxy (direct) + llm-proxy-route (via `deps`) invalidés** ; 4 autres entités intactes ; re-recherche des 2 invalidées ; `git status` = seuls `reference-/explanation-stream-proxy.md` réécrits + `.retro-doc.yml`, `source_sha` avancé | ✅ |
 | 2026-11-03 | S5 rewrite dépendant (nuance) | doc du dépendant réécrite si nécessaire | llm-proxy-route re-recherché mais **non réécrit** : la re-recherche a confirmé que le changement de stream-proxy était cosmétique (commentaire) → pas d'invention. Correct **ici** ; non testé sur changement sémantique | ⚠️ |
+| 2026-11-03 | S6 comparatif full v1↔v2 (coût) | coût absolu v2 ≤ v1 ($22.48) | v2 **$24.50** vs v1 $22.48 → **+9 %, non réduit** ; confondu par le grain (33 docs/17 entités vs 15 docs) ; poste dominant = écriture, pas lecture (voir Observations 6-7) | ❌ |
+| 2026-11-03 | S6 mécanique (délégation gros scope) | 7 chercheurs //, multi-entités, deps peuplé, garde-fou | ✅ 7 Sonnet //, 17 entités, deps peuplé, 1 entité `confidence: low` re-lue, findings sécurité remontés — mécanique nominale | ✅ |
 
 ### Analyse comparative des runs (2026-11-03)
 
@@ -518,6 +520,8 @@ S1/S2, le **même SHA** (`89ac41b`) — ils sont donc directement comparables.
 | S3 incrémental | **1m23** | **$1.27** | 621 881 → 5 003 (∑ 507 723) | 13 (inchangé) | `[]` | non (no-op) |
 | Re-test S1 (post-fix délég.) | 6m59 | $3.41 | 3 030 599 → 28 644 (∑ 2 858 967) | 14 | `[]` | **oui, Sonnet (confirmé)** |
 | S4 gros scope (6 entités) | 17m32 | $10.51 | 9 615 650 → 104 737 (∑ 9 240 764) | 27 (6 entités) | **peuplé** | **oui, 4 Sonnet // (confirmé)** |
+| **S6 full projet v2** | 25m22 | **$24.50** | 24 182 425 → 211 904 (∑ 23 093 496) | 17 entités / 33 docs | peuplé | **oui, 7 Sonnet //** (~947k délégués) |
+| v1.0.0 full projet (réf.) | n/a | **~$22.48** | n/a | 15 docs / cache v1 | — | non (inline Opus) |
 
 > 🤔 **Hypothèse** sur le format `X → Y (∑ Z)` : `X` = contexte cumulé en entrée,
 > `Y` = tokens générés, `Z` = part lue depuis le cache (sous-ensemble de `X`).
@@ -573,13 +577,76 @@ writer Opus ne lit plus le code — pourtant le coût est **identique** ($3.41,
   cache ci-dessus. Je ne peux pas trancher sans accès au `usage` brut (hors scope
   du plan, cf. « Hors scope : Mesure runtime du gain token »).
 
-**Synthèse** : les trois mécanismes **fonctionnent** (incrémental ✅ S3,
-search-hygiene ✅, délégation ✅ re-test). Le **gain de coût sur les full runs
-n'est toutefois pas démontré** — soit parce qu'il est réel mais invisible
-(facturation cache-dominée / attribution sous-agent inconnue), soit parce que
-l'architecture déplace le travail sans réduire le coût facturé dans ce modèle de
-billing. Le vrai gain mesurable et incontestable est **l'incrémental** (S3 : −63 %
-sur un module inchangé), pas la délégation.
+**Observation 6 — S6 réfute la thèse « déléguer la lecture réduit le coût ».**
+Pleine rétro-doc v2 : **$24.50** vs v1 **$22.48** → coût absolu **non réduit, +9 %**,
+malgré 7 chercheurs Sonnet et ~947k tokens délégués. Deux lectures :
+- **Confond de grain** : v2 a produit **33 docs / 17 entités** contre **15 docs** en
+  v1 (grain plus fin, choisi au cadrage). Ce n'est **pas** un périmètre égal. Par
+  doc, v2 est moins cher (~$0,74 vs ~$1,50), mais l'objectif du plan parlait de
+  coût **absolu**, pas de coût/doc.
+- **Le poste dominant n'est pas la lecture, c'est l'écriture.** Le contexte Opus
+  atteint **24 M** (∑ 23 M cache-read) alors que seulement ~947k sont délégués en
+  Sonnet. L'essentiel est donc le **contexte cumulé du writer pendant la phase
+  d'écriture** (33 docs écrits en séquence → contexte qui enfle, refacturé en
+  cache-read à chaque Write), pas la lecture du code. La délégation attaque la
+  lecture (poste **mineur** sur un full multi-docs) ; elle ne touche pas l'écriture.
+
+**Observation 7 — ça explique tout le reste.** Le levier de coût réel est le
+**nombre de docs écrits par run** (phase d'écriture), pas la lecture :
+- **Incrémental** (S3) réduit les docs réécrits → −63 %. ✅ C'est le seul vrai gain.
+- **Délégation** réduit la lecture → ~0 % sur un full multi-docs (S6), car la
+  lecture est marginale devant l'écriture. Elle ne « paie » que si la lecture
+  domine (gros fichier unique, cache froid) — pas le cas ici.
+
+> ❓ **À confirmer via Langfuse (split par modèle sur la session S6
+> `658a2b73…`)** : part Opus vs part Sonnet. L'hypothèse ci-dessus prédit Opus ≫
+> Sonnet. Si confirmé, la prémisse « la lecture est le poste dominant » du plan est
+> factuellement fausse pour une rétro-doc pleine.
+
+**Synthèse** : les trois mécanismes **fonctionnent** mécaniquement (incrémental ✅,
+search-hygiene ✅, délégation ✅). Mais sur le **coût**, le verdict est net :
+**l'incrémental porte tout le gain (−63 %)** ; **la délégation ne réduit pas le
+coût absolu** d'une rétro-doc pleine (S6 : +9 %, confondu par un grain plus fin).
+La délégation garde une valeur réelle — **parallélisme** (7 agents → 25 min pour 33
+docs), **qualité** (garde-fou confidence + findings sécurité), **grain plus fin à
+coût/doc moindre**, et le writer reste en `reasoning` pour le jugement — mais
+**pas** celle annoncée en tête du plan.
+
+### Comparatif qualité v1.0.0 vs v2.1.0 (même projet auxitum, « documente tout le projet »)
+
+> v1.0.0 = `doc.bak/retro.bak/` (**13 docs** = 9 Ref + 4 Exp, 1393 l., $22.48) ·
+> v2.1.0 = `doc/retro/` (**33 docs** = 16 Ref + 17 Exp, 2784 l., $24.50). La paire
+> `metering` présente dans retro.bak a été **ajoutée par les tests S1/S2** (sortie
+> v2), elle n'appartient pas à v1.0.0 et est exclue ici. Jugement basé sur les 2
+> INDEX, le metering, et des métriques objectives.
+
+| Dimension | v1.0.0 (13 docs) | v2.1.0 (33 docs) | Gagnant |
+|---|---|---|---|
+| **Couverture** | partition grossière : `backend-modules` agrège auth + persistance + operations + cloud + discovery + IaC dans **un seul** doc ; `orchestrator-api` concentre toute la surface REST | 17 sous-systèmes **éclatés** (auth-rbac, credentials, nutanix, ovh, ansible-terraform, operations-workflows, tool-dispatch…) | **v2** |
+| **Provenance `file:line`** | **4 ancres** sur les 13 docs (quasi aucune traçabilité) | **236 ancres** (tables fonctions/routes avec n° de ligne) | **v2 (×59)** |
+| **Honnêteté / confiance** | affirmations sans marqueur d'incertitude | marqueurs explicites `⚠️ confiance medium / non vérifié` (garde-fou étape 6 **visible** : `autoCleanup()` câblage cron non confirmé, legacy `llmUsage.js` wiring partiel) | **v2** |
+| **Complétude Diataxis** | **asymétrique : 9 Reference mais 4 Explanation** → 5 sous-systèmes ont le *quoi* sans le *pourquoi* | symétrique : 16 Ref + 17 Exp (+ un overview) | **v2** |
+| **Profondeur par doc** | docs **plus denses** (orchestrator-api 15,9K, backend-modules 13,5K, data-model 11K) ; moyenne ~107 l./doc | docs plus ciblés, moyenne ~84 l./doc | **v1** |
+| **Navigabilité** | gros docs fourre-tout ; INDEX complet pour ses 13 docs mais grain large | grain fin, groupement thématique, INDEX avec décisions saillantes (`fail-closed #31`, `role≠group`, `BLOCK/WARN/SAFE`) | **v2** |
+
+> Correction d'une analyse antérieure : l'INDEX v1 n'« omettait » pas le metering —
+> le metering ne faisait tout simplement pas partie de v1.0.0. L'INDEX v1 est
+> cohérent avec ses 13 docs. La critique retenue est l'**asymétrie Diataxis** (9/4).
+
+**Lecture.** v1 va **plus profond** par doc sur les (moins nombreux) sujets couverts,
+mais au prix de docs fourre-tout, d'une couverture Explanation lacunaire (4/9) et
+d'une traçabilité quasi nulle (4 ancres). v2 est **2,5× plus large, ×59 plus
+traçable, plus honnête et Diataxis-complet**, au prix d'une densité par doc moindre.
+Pour une rétro-doc d'archi — dont la valeur est la **confiance** (tout tracé au code)
+et la **découvrabilité** — v2 est nettement supérieur.
+
+**Ce que ça dit de #2.** La provenance `file:line` (×59) et les marqueurs
+`confidence` sont **exactement** le contrat de concept map (étape 2) et le garde-fou
+(étape 6) : visibles et attribuables dans la sortie v2. La délégation parallèle (7
+chercheurs) a permis cette **largeur** (17 sous-systèmes) à coût quasi constant. Le
+vrai acquis de #2 n'est pas « moins de tokens » mais **« 2,54× plus de doc
+(33 vs 13), ×59 plus tracée et plus honnête, pour +9 % de coût »** → **−57 %
+coût/doc** ($1,73 → $0,74), plus l'incrémental pour les runs suivants.
 
 ## Diagnostic en cours
 
@@ -651,3 +718,17 @@ régression bloquante est levée. Verdict délégation : ✅.
 - ⚠️ Gain de coût délégation **toujours non démontré** même sur gros scope (96 % cache-read, pas de baseline inline). Le vrai gain prouvé reste l'**incrémental**.
 - 🐛 Cross-skill (hors #2) : le hook `PreToolUse` de roadmap-tracking a bloqué la 1ʳᵉ écriture de retro-doc sous `auxitum/doc/retro/`. Candidat issue séparée.
 - 📋 Prochain : décision clôture (toutes étapes livrées + testées) vs. traitement des 2 limitations résiduelles.
+
+### Session 2026-11-03 (S6 — comparatif pleine rétro-doc v1↔v2)
+- ✅ Mécanique confirmée à grande échelle : 7 chercheurs Sonnet en parallèle, 17 entités, 33 docs, `deps` peuplé, garde-fou `confidence: low` (llm-metering-audit) re-lu, findings sécurité remontés sans invention.
+- ❌ **Thèse du plan réfutée sur le coût** : v2 **$24.50** vs v1 **$22.48** (+9 %, non réduit). Causes : (1) grain plus fin (33 docs vs 15 → pas périmètre égal), (2) **le poste dominant est l'écriture, pas la lecture** — contexte Opus 24 M vs ~947k délégués en Sonnet. La délégation attaque un poste mineur sur un full multi-docs. Détail : `### Analyse comparative § Observations 6-7`.
+- 💡 Insight structurant : le levier de coût = **nombre de docs écrits/run** (écriture), pas la lecture. L'**incrémental** (S3, −63 %) est le seul vrai gain ; la délégation apporte parallélisme + qualité + grain fin, pas l'économie annoncée.
+- ❓ Reste à confirmer : split Opus/Sonnet via Langfuse (session `658a2b73…`) pour prouver « écriture ≫ lecture ».
+- 📋 Prochain : décision utilisateur sur la clôture et l'éventuel recadrage de l'objectif du plan (délégation = qualité/parallélisme, incrémental = coût).
+
+### Session 2026-11-03 (clôture)
+- ✅ Comparatif qualité v1.0.0 (13 docs) vs v2.1.0 (33 docs) établi sur chiffres vrais (metering S1/S2 exclu) : v2 = 2,54× docs, provenance `file:line` ×59 (4 → 236), Diataxis symétrique, marqueurs `confidence` visibles, pour +9 % coût → **−57 % coût/doc**. Voir `## Tests § Comparatif qualité`.
+- 🎯 **Objectif recadré** : le gain n'est pas « moins de tokens en absolu » (réfuté : écriture ≫ lecture) mais **« beaucoup plus de doc, mieux tracée et plus honnête, à coût/doc réduit »** + **incrémental** (−63 % sur re-run inchangé) comme vrai levier du coût absolu des runs suivants. Délégation = largeur (parallélisme) + qualité (contrat concept map + garde-fou), pas économie absolue.
+- ✅ Clôture : 6 étapes + 🧪 Tests + ✅ Validation livrées ; `status: done`, déplacé dans `done/`, vues régénérées, issue #2 fermée.
+- 📌 Limitations documentées (non bloquantes) : (1) rewrite d'un dépendant propagé sur changement **sémantique** non testé (S5 = cosmétique) ; (2) gain de coût absolu de la délégation non démontré (écriture-dominé, cache-dominé).
+- 🔗 Suite hors #2 : bug cross-skill — le hook `PreToolUse` de roadmap-tracking bloque la 1ʳᵉ écriture de retro-doc sous `doc/retro/` sur un projet ayant `doc/roadmap/`. À tracer en **issue séparée** (ex. exclure `doc/retro/` comme `doc/roadmap/` l'est déjà).

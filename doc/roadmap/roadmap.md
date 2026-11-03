@@ -6,8 +6,4 @@
 
 ## À faire
 
-### [Issue: #2] [⚡] Plan #2 - retro-doc token optimization [PRIORITÉ: HAUTE] [Complexité: L] 🟢
-
-Plan : [`2-retro-doc-token-optimization.md`](2-retro-doc-token-optimization.md)
-
----
+_Aucun plan actif._
