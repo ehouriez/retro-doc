@@ -7,3 +7,4 @@
 |---|---|---|---|---|
 | #1 | [📚] Plan #1 - retro-doc skill | high | L | [`1-retro-doc-skill.md`](1-retro-doc-skill.md) |
 | #2 | [⚡] Plan #2 - retro-doc token optimization | high | L | [`2-retro-doc-token-optimization.md`](2-retro-doc-token-optimization.md) |
+| #3 | [🗂️] Plan #3 - retro-doc catalogue-first mode + researcher self-check | high | L | [`3-retro-doc-catalogue-first.md`](3-retro-doc-catalogue-first.md) |

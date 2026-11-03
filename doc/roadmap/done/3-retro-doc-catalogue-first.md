@@ -2,8 +2,8 @@
 plan:
   id: '3'
   name: 3-retro-doc-catalogue-first.md
-  link: https://github.com/ehouriez/retro-doc/blob/main/doc/roadmap/3-retro-doc-catalogue-first.md
-status: active
+  link: https://github.com/ehouriez/retro-doc/blob/main/doc/roadmap/done/3-retro-doc-catalogue-first.md
+status: done
 date: 2026-11-03
 description: >
   Transposer deux emprunts du skill retrodoc-run de Damien vers retro-doc :
@@ -83,8 +83,8 @@ modèle figé en frontmatter.
 - [x] Étape 3 — **Lot B** : mode **catalogue par défaut**. Un run sans `--expand` produit l'inventaire : cartographie légère (glob/grep, déjà faite en étape 4) → une entité par sous-système avec `id` + une ligne de description, **sans déléguer l'archéologie profonde** et **sans écrire de fiches**. Persister chaque entité `status: catalogued`. Écrire/mettre à jour l'INDEX. Décrire ce branchement dans `SKILL.md` (étape 3 « Regeneration mode » ou nouvelle sous-section amont). (L · reasoning → Opus)
 - [x] Étape 4 — **Lot B** : flag `--expand <id>` et `--expand all` (défaut si le flag est absent OU donné sans argument). Pour chaque entité ciblée : déléguer la recherche (researcher Sonnet, inchangé), écrire Reference + Explanation, basculer `status: generated`, mettre à jour le cache et l'INDEX. `--expand all` = affine toutes les entités `catalogued`. Résolution de `<id>` depuis `.retro-doc.yml`. (L · reasoning → Opus)
 - [x] Étape 5 — **Lot B** : rendu INDEX listant **toutes** les entités (générées ET cataloguées) avec marqueur ✅ générée / ⬜ cataloguée, par quadrant/sous-système. L'INDEX reste régénéré à chaque run (catalogue comme expand). Dans `SKILL.md` (étape INDEX). (M · standard → Sonnet)
-- [ ] 🧪 Tests — Rédiger et exécuter la procédure de test (avant-dernière étape, obligatoire)
-- [ ] ✅ Validation — Vérifier les résultats des tests et clôturer (dernière étape, obligatoire)
+- [x] 🧪 Tests — Rédiger et exécuter la procédure de test (avant-dernière étape, obligatoire)
+- [x] ✅ Validation — Vérifier les résultats des tests et clôturer (dernière étape, obligatoire)
 
 > **Lots** : Lot A = étape 1 (livrable immédiat, indépendant). Lot B = étapes 2→5
 > (archi catalogue-first ; ordre : cache → catalogue → expand → INDEX).
@@ -190,6 +190,15 @@ grep -A3 "All run types" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/S
 
 | Date | Test | Attendu | Observé | Verdict |
 |------|------|---------|---------|---------|
+| 2026-11-03 | Bloc A — self-check SKILL.md Step 4 | ligne contenant "Self-check" | l.304 `Self-check before returning (mandatory in the prompt)` | ✅ |
+| 2026-11-03 | Bloc A — self-check delegation.md | ligne contenant "Self-check" | l.60 `Self-check before returning (mandatory in the prompt)` | ✅ |
+| 2026-11-03 | Bloc B — status field cache-schema.md | `status: catalogued\|generated` présent | l.40 table + l.70 YAML exemple | ✅ |
+| 2026-11-03 | Bloc B — status field SKILL.md Step 9 | `status: catalogued\|generated` présent | plusieurs occurrences dont l.470 YAML + l.484 règle catalogue run | ✅ |
+| 2026-11-03 | Bloc C — CATALOGUE mode SKILL.md | `CATALOGUE` présent dans Step 3 | l.141 heading, l.155-159 table + description | ✅ |
+| 2026-11-03 | Bloc C — --expand flag SKILL.md | `--expand` présent dans Step 3 | l.155-157 table, l.171, l.182 + Hard rules l.582-583 | ✅ |
+| 2026-11-03 | Bloc D — template INDEX templates.md | `Status\|✅\|⬜` présents | l.87 légende, l.89 headers, l.91-92 exemples ✅/⬜ | ✅ |
+| 2026-11-03 | Bloc D — Step 8 "every entity" SKILL.md | "every entity (generated and catalogued)" + "always fully regenerated" | l.410-414 conforme | ✅ |
+| 2026-11-03 | Bloc D — "All run types" SKILL.md | bloc couvrant catalogue + expand full + expand incrémental | l.428-431 présent et correct | ✅ |
 
 ## Journal de session
 
@@ -210,4 +219,4 @@ grep -A3 "All run types" /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/skills/retro-doc/S
 
 ### Session 2026-11-03 (étape 5)
 - ✅ Étape 5 : `SKILL.md` Step 8 mis à jour — INDEX liste désormais toutes les entités (générées + cataloguées) avec marqueurs ✅/⬜, colonne « Docs » avec liens pour les générées et `—` pour les cataloguées, régénération complète à chaque run (catalogue comme expand). Note « Incremental runs » remplacée par une note couvrant tous les types de run. `references/templates.md` template INDEX aligné (nouvelle table `Status | Entity | Docs | Description`, légende ✅/⬜ dans le bloc `>`).
-- 📋 Prochain : 🧪 Tests contre auxitum, puis ✅ Validation + clôture.
+- ✅ Plan clôturé : 9/9 tests passés. Tous les lots (A + B étapes 1→5) livrés et validés.
