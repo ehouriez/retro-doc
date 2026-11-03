@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: Emmanuel Houriez
-  version: "2.2.0"
+  version: "2.2.1"
 allowed-tools:
   - Bash
   - Read
@@ -164,8 +164,26 @@ never writes a Reference or Explanation file:
    one-line `description`. No public-surface listing, no archaeology.
 3. Persist every entity with `status: catalogued` in the v2 cache (Step 9), leaving
    any already-`generated` entity untouched.
-4. (Re)write the INDEX (Step 8) and the run report, then **STOP** — skip the full vs
-   incremental decision below and Steps 4–7 (deep research and doc writing).
+4. (Re)write the INDEX (Step 8), produce the **catalogue report** below, then
+   **STOP** — skip Steps 4–7 and Step 11 (no generated doc files to scan).
+
+   ```
+   retro-doc catalogue:
+     Scope:     <scope>
+     Mode:      catalogue — N entity(ies) inventoried, 0 docs written
+     Language:  <lang>  (persisted in <base>/retro/.retro-doc.yml)
+     Output:    <base>/retro/INDEX.md
+
+   Entities catalogued:
+     ⬜ <id-1>   — <one-line description>
+     ⬜ <id-2>   — <one-line description>
+     …
+
+   Next: generate full docs with --expand
+     All entities:   /retro-doc --expand all
+     One entity:     /retro-doc --expand <id-1>
+     Several:        /retro-doc --expand <id-1>,<id-2>
+   ```
 
 **EXPAND mode** — generate full docs for the targeted entities. Resolve each `<id>`
 against the `entities[]` of `.retro-doc.yml`; a bare `--expand` or `--expand all`
@@ -523,6 +541,9 @@ Fix any failure before reporting.
 ---
 
 ## Step 11 — Secret scan, then STOP (no commit, no push)
+
+> **Catalogue runs skip this step entirely** — no doc files were generated, so
+> there is nothing to scan. The run report was already produced in Step 3, item 4.
 
 > **Scan scope.** Target only the files written or rewritten during this run —
 > the filenames from the `docs` entries of Step 9's entities, plus
