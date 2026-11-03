@@ -304,8 +304,17 @@ echo "=== Revert The Marker ==="
 git reset --hard HEAD~1
 ```
 
+**Re-test délégation (transverse, après correctif session 2026-11-03) :**
+Sur **chaque** run (y compris S1 sur le petit scope metering), vérifier dans l'UI
+Claude Code qu'**au moins un sous-agent `Task` est lancé** (modèle Sonnet) pour
+l'archéologie — le writer Opus ne doit **jamais** lire le code source lui-même
+(hors re-lecture ciblée des claims `confidence: low`). Indices d'un échec : aucun
+`Task` visible, le writer enchaîne des `Read`/`Grep` sur le code source, coût
+writer élevé. Vérifier aussi que `deps` du cache se re-peuple si le module a des
+dépendances réelles.
+
 **Résultats attendus :**
-- **S1** : `doc/retro/` recréé avec `reference-*` / `explanation-*` / `INDEX.md` ; `.retro-doc.yml` en `schema_version: 2` avec `source_sha` et `entities[]` peuplé.
+- **S1** : `doc/retro/` recréé avec `reference-*` / `explanation-*` / `INDEX.md` ; `.retro-doc.yml` en `schema_version: 2` avec `source_sha` et `entities[]` peuplé. **Un sous-agent Sonnet est lancé** (délégation effective).
 - **S2** : le skill **signale un cache v1** (pas de `schema_version`) → **run complet forcé**, puis `.retro-doc.yml` réécrit en `schema_version: 2` avec `source_sha` + `entities[]`.
 - **S3** : le skill annonce un **run incrémental** ne re-recherchant que l'entité dont `FILE` est une source (+ ses dépendants directs) ; seules les docs de cette entité sont modifiées (les autres intactes) ; `source_sha` = nouveau HEAD. Après revert, working tree propre.
 - Transverses : aucun commit auto par le skill ; scan secrets propre ; exactitude `file:line` ≥ v1.
@@ -314,6 +323,37 @@ git reset --hard HEAD~1
 
 | Date | Test | Attendu | Observé | Verdict |
 |------|------|---------|---------|---------|
+| 2026-11-03 | S1 neuf (pré-fix) | cache v2 peuplé | cache v2 écrit (sources + deps), **mais chercheur hang** sur greps non filtrés (31088 fichiers) — $5.73 / 12m55 | ⚠️ |
+| 2026-11-03 | S1 neuf (post-fix hygiene) | cache v2, pas de hang | pas de hang — $3.41 / 8m58 ; `deps: []` (était peuplé avant fix) | ⚠️ |
+| 2026-11-03 | S2 rétrocompat v1→v2 | v1 détecté → full forcé → réécrit v2 | `schema_version: 2` + `source_sha` + `entities[]` réécrits — $3.66 / 7m58 | ✅ |
+| 2026-11-03 | S3 incrémental réel | run incrémental ; entité non invalidée si source inchangée | diff `89ac41b..HEAD` → aucune source metering touchée (seul `server.js` marker) → **no-op correct** — $1.27 / 1m23 | ✅ |
+| 2026-11-03 | Délégation (transverse, bloquant) | archéologie déléguée à un sous-agent Sonnet, writer Opus = orchestration/écriture seule | writer **Opus a fait l'archéologie INLINE** (« petit périmètre cohérent → lecture directe, pas de sous-agent ») → économie de tokens défaite | ❌ |
+
+## Diagnostic en cours
+
+### Bloc — Délégation non forcée (régression critique, remontée aux tests 🧪)
+
+**Symptôme** : sur un scope jugé « petit » (3 fichiers ≈ 660 l.), le writer Opus
+lit le code lui-même au lieu de déléguer à un sous-agent Sonnet. L'objectif
+primaire de #2 (déporter l'archéologie — poste de tokens dominant — sur le tier
+`standard`) est annulé dès que le writer estime la tâche triviale.
+
+**Cause racine (vérifiée dans `SKILL.md` Step 4 + `references/delegation.md`)** :
+le wording n'impose nulle part la délégation inconditionnelle. Trois portes de sortie :
+1. Step 4 item 1 : « Read the entry points inline » → le modèle étend la lecture inline au module.
+2. Step 4 item 2 / delegation.md item 2 : « ≤ ~3 entities → one sub-agent » → interprété comme « petit → pas de sous-agent » au lieu de « petit → un seul sous-agent ».
+3. Step 4 item 3 / delegation.md item 4 : fallback inline déclenché sur un **jugement de trivialité**, alors qu'il ne doit l'être que sur une **indisponibilité réelle du tool `Agent`**.
+
+**Correctif appliqué (session 2026-11-03, re-test requis)** : délégation rendue
+**obligatoire quelle que soit la taille du scope** ; le parallélisme adaptatif ne
+pilote que le *nombre* de chercheurs (≥ 1), jamais le *si* ; fallback inline
+restreint à l'indisponibilité avérée du tool ; item 1 clarifié (carto ≠
+archéologie) ; nouvelle Hard rule. Fichiers : `SKILL.md` Step 4 (items 1-3 +
+Hard rules), `references/delegation.md` (items 2, 4).
+
+**Pistes ouvertes à vérifier au re-test** :
+- `deps: []` sur S1-post-fix et S2 alors que le run pré-fix avait `deps: [db, streamProxy, config, auth]`. À confirmer : la délégation forcée re-peuple-t-elle `deps` (sinon la propagation 1-niveau de l'étape 5 ne se déclenchera jamais) ? Non tranché faute d'accès à la sortie brute du chercheur.
+- Coût writer Opus résiduel attendu **bas** une fois la lecture 100 % déléguée (orchestration + écriture + re-lecture ciblée des `confidence: low` seulement).
 
 ## Journal de session
 
@@ -337,4 +377,6 @@ git reset --hard HEAD~1
 - 🔧 Renumérotation : insertion du Step 3 a décalé l'archéologie → Step 4, puis 4→5…10→11 ; toutes les cross-refs internes et le résumé final (`Mode: full | incremental`) mis à jour ; version metadata bumpée `1.0.0` → `2.0.0`.
 - 🔒 Décision étape 4 tranchée : base de diff = `source_sha..HEAD` (commité seul) ; limite documentée dans le Step 3 (editions working-tree non détectées → commiter ou `full`). Conforme au scénario de test 3 qui commite le marqueur.
 - 🐛 Correctif (remonté par le 1er test réel) : le chercheur Sonnet a hang sur des `grep -rn …/auxitum-orchestrator/` sans exclusion → 31088 fichiers scannés (×65) sur mount `/mnt/c`, 2 tasks `stopped`, `dependents[]` incomplet. Le `find` de carto excluait déjà les vendored dirs mais l'exclusion n'était **pas transmise au chercheur**. Ajout d'une consigne « search hygiene » (`--exclude-dir={node_modules,dist,build,.next,vendor,.git}` ou `rg`) dans le prompt de délégation : `SKILL.md` Step 4 item 2, fallback item 3, et `references/delegation.md` protocole item 3.
-- 📋 Prochain : 🧪 Tests (3 scénarios sur auxitum) puis ✅ Validation.
+- 🧪 Tests joués (voir tableau `## Tests`) : S2 ✅, S3 ✅ (incrémental no-op correct, $1.27), S1 ⚠️ (fonctionnel mais `deps: []`), **Délégation ❌ bloquant**.
+- 🐛 Régression critique (remontée par l'utilisateur au test délégation) : writer Opus fait l'archéologie **inline** sur scope « petit » au lieu de déléguer → objectif #2 défait. Cause : wording non impératif (3 portes de sortie). Correctif : délégation rendue **obligatoire quelle que soit la taille** (`SKILL.md` Step 4 items 1-3 + nouvelle Hard rule ; `references/delegation.md` items 2, 4). Détail et pistes ouvertes dans `## Diagnostic en cours`.
+- 📋 Prochain : **re-test délégation** (vérifier qu'un sous-agent Sonnet est bien lancé sur petit scope + que `deps` se re-peuple), puis reprise de 🧪 Tests → ✅ Validation.

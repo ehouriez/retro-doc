@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: Emmanuel Houriez
-  version: "2.0.1"
+  version: "2.1.0"
 allowed-tools:
   - Bash
   - Read
@@ -240,11 +240,19 @@ roles, the tier → model mapping, and the full output contract.
    Read the entry points inline: `README*`, `ARCHITECTURE*`, `CONTRIBUTING*`,
    `CLAUDE.md` / `AGENTS.md`, and the project manifest (`package.json` /
    `pyproject.toml` / `Cargo.toml` / `go.mod` / `pom.xml` / `composer.json`).
+   This is **cartography to size the scope, not the archaeology**: the module's
+   implementation, tests and dependencies are read by the researcher (item 2),
+   never by the writer here.
 
-2. **Delegate the deep research.** Launch the researcher(s) via the `Agent`
-   tool (`subagent_type: "general-purpose"`, `model: "sonnet"` — the `standard`
-   tier). **Adaptive parallelism:** ≤ ~3 entities → one sub-agent for the whole
-   scope; more → one sub-agent per coherent group of entities, launched in
+2. **Delegate the deep research — always, regardless of scope size.** The heavy
+   source reading is **never** done by the writer, not even for a single small
+   entity or a scope that looks trivial: the writer orchestrates and writes, the
+   researcher reads. A "small" or "simple" module is **not** a reason to read
+   inline — delegate anyway. Launch the researcher(s) via the `Agent` tool
+   (`subagent_type: "general-purpose"`, `model: "sonnet"` — the `standard` tier).
+   **Adaptive parallelism controls the _number_ of researchers, never _whether_
+   to delegate:** ≤ ~3 entities → **one** sub-agent for the whole scope (minimum
+   one, always); more → one sub-agent per coherent group of entities, launched in
    parallel. Each researcher reads the source end to end — implementation, tests
    (intended behavior, edge cases, real usage), dependencies, and inline
    `NOTE:`/`DESIGN:`/`WHY:` comments — and returns the **concept-map output
@@ -259,13 +267,17 @@ roles, the tier → model mapping, and the full output contract.
    hangs. **Never use `fork`** — it inherits the parent context (ruining the token
    economy) and ignores the `model` override.
 
-3. **Fallback — inline archaeology.** If the `Agent` tool or the target model is
-   unavailable, the writer does the research itself (identical to the v1 Step 3:
-   read implementation end to end, tests, dependencies, inline comments; build
-   the same concept map, with the same `source`/`confidence` on every claim). The
-   same search hygiene applies — exclude `node_modules,dist,build,.next,vendor,.git`
-   from recursive greps. Delegation is an optimisation, not a dependency — the
-   skill stays prompt-only. The rest of the pipeline is identical either way.
+3. **Fallback — inline archaeology (tool genuinely unavailable ONLY).** Only when
+   the `Agent` tool cannot be used — not callable in this IDE, erroring, or unable
+   to honour the `model` override — does the writer do the research itself
+   (identical to the v1 Step 3: read implementation end to end, tests,
+   dependencies, inline comments; build the same concept map, with the same
+   `source`/`confidence` on every claim). **A small, simple, or "trivial-looking"
+   scope is never a reason to fall back** — that is a judgment call the skill
+   forbids; delegate (item 2) instead. The same search hygiene applies — exclude
+   `node_modules,dist,build,.next,vendor,.git` from recursive greps. Inline is the
+   degraded path that keeps the skill prompt-only and multi-IDE safe, not an
+   optimisation choice. The rest of the pipeline is identical either way.
 
 4. **Consolidate the map.** The returned concept map (or the inline one) is the
    single input to partition and writing. Each claim's `source`, the
@@ -502,6 +514,9 @@ Next (yours): review the diff, then commit and push.
 ## Hard rules
 
 - **Research before writing.** Step 4 is not optional.
+- **Always delegate the heavy reading.** The writer never does the archaeology
+  itself whatever the scope size; inline archaeology is the tool-unavailable
+  fallback only, never a scope-size or triviality judgment.
 - **Accuracy over everything.** Traceable to code or not stated.
 - **Reference ≠ Explanation ≠ How-to ≠ Tutorial.** Do not mix quadrants.
 - **Default is Reference + Explanation + INDEX.** Tutorial/How-to on request only.

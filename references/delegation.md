@@ -35,10 +35,14 @@ precisely where judgement pays. State the recommendation once, do not block.
 1. After the base + language are resolved, run a **light cartography**
    (`glob`/`grep`) to estimate the entities in scope. This is cheap (`find`/`grep`),
    so the writer does it inline — no separate agent.
-2. **Adaptive parallelism:**
-   - ≤ ~3 entities → **one** researcher sub-agent for the whole scope.
+2. **Delegation is mandatory — the writer never reads source for archaeology,
+   whatever the scope.** A small, simple or "trivial-looking" module is not a
+   reason to read inline. Adaptive parallelism sets only the **number** of
+   researchers (always ≥ 1), never **whether** to delegate:
+   - ≤ ~3 entities → **one** researcher sub-agent for the whole scope (minimum one).
    - more → **one sub-agent per coherent group** of entities, launched in parallel.
-   - This avoids paying N start-up costs on a small project.
+   - This avoids paying N start-up costs on a small project — but one start-up
+     cost is always paid, because the heavy reading always leaves the writer.
 3. Launch each researcher with the `Agent` tool:
    - `subagent_type: "general-purpose"`
    - `model: "sonnet"` (the resolved `standard` tier)
@@ -55,10 +59,12 @@ precisely where judgement pays. State the recommendation once, do not block.
      cartography `find` in `SKILL.md` Step 4.
    - **Never use `fork`.** A fork inherits the parent context (which ruins the
      token economy) and ignores the `model` override.
-4. **Fallback.** If the `Agent` tool or the target model is unavailable, the
-   writer does the archaeology inline (identical to the v1 Step 3). The rest of
-   the pipeline is unchanged — delegation is an optimisation, not a dependency,
-   so the skill stays prompt-only and multi-IDE safe.
+4. **Fallback — tool genuinely unavailable ONLY.** The writer does the archaeology
+   inline (identical to the v1 Step 3) **only** when the `Agent` tool cannot be
+   used: not callable in this IDE, erroring, or unable to honour the `model`
+   override. Scope size or perceived triviality is **never** a valid reason to
+   fall back — delegate instead (item 2). Inline is the degraded path that keeps
+   the skill prompt-only and multi-IDE safe, not an optimisation choice.
 
 ## Concept-map output contract
 
