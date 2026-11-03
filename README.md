@@ -6,6 +6,10 @@ codebase, then writes **Reference + Explanation** docs and a linked **INDEX**
 (Tutorial/How-to on request).
 
 - **Prompt-only** — no scripts, no runtime dependency (no Python, Node, or bun).
+- **Catalogue-first by default** — a plain run inventories the codebase cheaply;
+  use `--expand` to generate full docs for all or specific entities.
+- **Incremental on re-runs** — only entities whose sources changed are
+  re-researched and rewritten; unchanged entities are reused from cache.
 - **Per-project output language** — auto-detected, confirmed once, persisted.
 - **Dedicated, regenerable output** under `<doc|docs>/retro/`.
 - **Never commits or pushes** — it writes files and stops; git stays yours.
@@ -19,24 +23,37 @@ claude plugin install retro-doc@retro-doc
 
 ## Usage
 
-Invoke the skill, optionally with a target:
+Invoke the skill, optionally with a target and `--expand` flag:
 
 ```
-/retro-doc
-/retro-doc document the auth module
-/retro-doc documente tout le projet en français
+/retro-doc                                      → catalogue only (cheap inventory, no docs)
+/retro-doc --expand all                         → catalogue + full docs for every entity
+/retro-doc --expand auth-service,billing        → catalogue + docs for named entities only
+/retro-doc document the auth module --expand all
+/retro-doc documente tout le projet en français --expand all
 ```
 
-The skill will:
+### Catalogue run (default — no `--expand`)
 
-1. Confirm the scope and default deliverable (Reference + Explanation + INDEX).
-2. Resolve and persist the output language.
-3. Research the codebase (structure, entry points, source, tests).
-4. Partition each entity across Diataxis quadrants.
-5. Write Reference docs, then Explanation docs, then the INDEX.
-6. Link the INDEX from the project README.
-7. Scan the generated files for leaked secrets.
-8. Report a summary and stop — you review, commit, and push.
+1. Confirm scope and output language (auto-detected, persisted).
+2. Light cartography (`glob`/`grep`) — one entity per subsystem with a one-line description.
+3. Write the INDEX listing every entity with a ⬜ (catalogued) marker.
+4. Stop — no deep research, no Reference or Explanation files written.
+
+### Expand run (`--expand <id>[,<id>…]` or `--expand all`)
+
+Picks up where the catalogue left off:
+
+1. Delegate deep research to a researcher sub-agent (cheaper `standard` model).
+2. Partition each entity across Diataxis quadrants.
+3. Write Reference docs, then Explanation docs.
+4. Update the INDEX — expanded entities flip from ⬜ to ✅.
+5. Link the INDEX from the project README.
+6. Scan generated files for leaked secrets.
+7. Report a summary and stop — you review, commit, and push.
+
+On subsequent runs the skill is **incremental by default**: only entities whose
+sources changed since the last run are re-researched and rewritten.
 
 Ask explicitly if you also want **Tutorial** or **How-to** guides; they are not
 produced by default (see "Why" below).
@@ -45,10 +62,10 @@ produced by default (see "Why" below).
 
 ```
 <doc|docs>/retro/
-├── INDEX.md
-├── .retro-doc.yml            # persisted output language
-├── reference-<slug>.md
-└── explanation-<slug>.md
+├── INDEX.md                  # all entities: ✅ documented | ⬜ catalogued
+├── .retro-doc.yml            # persisted language + incremental cache (v2)
+├── reference-<slug>.md       # written by --expand only
+└── explanation-<slug>.md     # written by --expand only
 ```
 
 The `retro/` subtree is the frontier between generated (regenerable) docs and
