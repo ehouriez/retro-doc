@@ -331,22 +331,44 @@ dépendances réelles.
 
 #### Prérequis S4/S5
 
-- Working tree `auxitum/doc/retro/` **propre** avant de commencer (les manips S1-S3
-  l'ont laissé sale). Restaurer l'état committé puis repartir :
+> ⚠️ **Isoler le test.** Le `doc/retro` committé contient la rétro-doc **v1 de
+> tout auxitum** (scope large). Lancer S4 (scope = sous-système LLM) par-dessus
+> mélangerait anciennes et nouvelles entités et fausserait les assertions (N
+> entités, `deps`). On part donc d'un `doc/retro` **vide**, puis on **restaure**
+> l'original à la fin. On **conserve** la v1 (backup), on ne la supprime pas.
 
 ```bash
 echo "=== Go To auxitum ==="
 cd /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum
 
-echo "=== Restore A Clean Committed doc/retro ==="
+echo "=== Restore The Committed doc/retro (undo S1-S3 working-tree manips) ==="
 git checkout -- doc/retro
 
-echo "=== Remove Any Leftover Test Backups ==="
+echo "=== Remove Any Leftover Test Backups From S1-S3 ==="
 rm -rf doc/retro.bak doc/retro.new doc.bak
 
-echo "=== Confirm Clean Working Tree ==="
-git status --short
+echo "=== Back Up The v1 doc/retro Aside (preserve, do not delete) ==="
+mv doc/retro doc/retro.v1.bak
+
+echo "=== Confirm doc/retro Is Absent So S4 Starts Fresh ==="
+ls doc/retro 2>/dev/null || echo "doc/retro absent — ready for a clean full run"
 ```
+
+> **Après S4/S5** (une fois les résultats relevés), restaurer l'état d'origine :
+>
+> ```bash
+> echo "=== Go To auxitum ==="
+> cd /mnt/c/INETUM/AGV/agv-adm/GIT_GITHUB/auxitum
+>
+> echo "=== Drop The Test Output ==="
+> rm -rf doc/retro
+>
+> echo "=== Restore The v1 doc/retro ==="
+> mv doc/retro.v1.bak doc/retro
+>
+> echo "=== Confirm Working Tree Is Clean ==="
+> git status --short doc/retro
+> ```
 
 **Scénario 4 — gros scope full run (délégation + multi-entités) :**
 
@@ -400,12 +422,13 @@ git status --short doc/retro/
 echo "=== Inspect Cache source_sha Advanced ==="
 cat doc/retro/.retro-doc.yml
 
-echo "=== Revert The Marker ==="
+echo "=== Revert The streamProxy Marker Commit (leaves untracked doc/retro test output in place) ==="
 git reset --hard HEAD~1
-
-echo "=== Restore doc/retro To Committed State ==="
-git checkout -- doc/retro
 ```
+
+> `doc/retro` est ici une sortie de test **non trackée** → `git reset --hard` ne
+> la touche pas. Sa suppression + la restauration de la v1 sont faites par le
+> bloc « Après S4/S5 » du prérequis ci-dessus.
 
 **Résultats attendus S4/S5 :**
 - **S4** : `doc/retro/` contient **plusieurs** `reference-*` / `explanation-*` (une paire par entité) ; `.retro-doc.yml` liste **≥ 3-4 entités** dont au moins une avec `deps` **non vide** pointant vers les **ids d'autres entités documentées** (preuve que `dependencies` → `deps` se peuple quand il y a des pairs). Observer si **plusieurs sous-agents Sonnet** sont lancés en parallèle (parallélisme adaptatif, > ~3 entités). Noter coût + contexte d'entrée pour comparer au mono-entité.
