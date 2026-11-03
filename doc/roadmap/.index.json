@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1",
+    "status": "done",
+    "priority": "high",
+    "complexity": "L",
+    "title": "[📚] Plan #1 - retro-doc skill",
+    "deps": [],
+    "path": "done/1-retro-doc-skill.md"
+  },
+  {
+    "id": "2",
+    "status": "active",
+    "priority": "high",
+    "complexity": "L",
+    "title": "[⚡] Plan #2 - retro-doc token optimization",
+    "deps": [],
+    "path": "2-retro-doc-token-optimization.md"
+  }
+]
